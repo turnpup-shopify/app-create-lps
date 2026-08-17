@@ -1,0 +1,15 @@
+type,product,label,detail,tags
+product,brass-pull,Solid brass cabinet pull,Unlacquered brass in six finishes,
+product,sleep-mat,Clinical sleep mat,Pressure mapped foam core,
+claim,brass-pull,Ages instead of chipping,Unlacquered brass patinas where plated finishes flake,
+claim,brass-pull,One screw spacing fits most cabinets,Standard 96mm and 128mm centers,
+claim,brass-pull,Weighs twice what zinc does,340g per pull against 160g for zinc alloy,
+claim,sleep-mat,Holds pressure relief for eight hours,Foam recovers 94 percent after nightly load testing,
+claim,sleep-mat,Runs cool without a gel layer,Open cell structure moves heat by convection,
+claim,*,Ships from our own warehouse,No drop ship delay,
+worry,*,Feels expensive for what it is,Forty five day money back guarantee. Send it back used.,price
+worry,*,I have not heard of you,Over one thousand clinicians recommend it to clients,trust
+worry,brass-pull,Will the finish look wrong next to my faucet,Free finish samples before you order,fit
+worry,brass-pull,Sounds like a hard install,One screwdriver. Eight minutes per door.,effort
+worry,sleep-mat,What if it does not fit my frame,Four sizes and a fit guide by frame type,fit
+worry,*,What if it arrives damaged,Replaced in five days with no return shipment,risk

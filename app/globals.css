@@ -1,0 +1,424 @@
+@import 'tailwindcss';
+
+/* ------------------------------------------------------------------ */
+/* Tokens                                                              */
+/* ------------------------------------------------------------------ */
+
+:root {
+  --paper: #e7eae4;
+  --card: #f6f7f3;
+  --ink: #191e19;
+  --muted: #6c736b;
+  --rule: #c8cdc4;
+  --mark: #efe05c;
+  --deep: #1e3a6b;
+  /* Readable ink on the highlighter stripe. */
+  --mark-ink: #4a4c2e;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-mark: var(--mark);
+  --color-deep: var(--deep);
+
+  --font-display: var(--font-display-family), Georgia, serif;
+  --font-sans: var(--font-sans-family), system-ui, sans-serif;
+  --font-mono: var(--font-mono-family), ui-monospace, monospace;
+}
+
+/* ------------------------------------------------------------------ */
+/* Base                                                                */
+/* ------------------------------------------------------------------ */
+
+html {
+  background: var(--paper);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans-family), system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Visible keyboard focus on everything. */
+:focus-visible {
+  outline: 2px solid var(--deep);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Type                                                               */
+/* ------------------------------------------------------------------ */
+
+.display {
+  font-family: var(--font-display-family), Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+.masthead {
+  font-family: var(--font-display-family), Georgia, serif;
+  font-weight: 300;
+  font-size: clamp(30px, 5.5vw, 50px);
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+}
+
+.section-title {
+  font-family: var(--font-display-family), Georgia, serif;
+  font-weight: 500;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+}
+
+/* Small structural labels. Role names, step numbers. */
+.label {
+  font-family: var(--font-mono-family), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.step-number {
+  font-family: var(--font-mono-family), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ------------------------------------------------------------------ */
+/* The highlighter. The only place --mark appears.                     */
+/* ------------------------------------------------------------------ */
+
+.marked {
+  background: linear-gradient(to top, var(--mark) 62%, transparent 62%);
+  border-color: var(--ink);
+}
+
+/* ------------------------------------------------------------------ */
+/* Controls                                                            */
+/* ------------------------------------------------------------------ */
+
+.pill {
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 7px 11px;
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease;
+}
+
+.pill:hover {
+  border-color: var(--ink);
+}
+
+.pill[data-on='true'] {
+  background: linear-gradient(to top, var(--mark) 62%, transparent 62%);
+  border-color: var(--ink);
+  font-weight: 500;
+}
+
+.pill small {
+  display: block;
+  color: var(--muted);
+  font-size: 11.5px;
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+.pill[data-on='true'] small {
+  color: var(--mark-ink);
+}
+
+.pill[data-gone='true'] {
+  text-decoration: line-through;
+  color: var(--muted);
+  border-style: dashed;
+  cursor: default;
+}
+
+.chip {
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  background: linear-gradient(to top, var(--mark) 62%, transparent 62%);
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  padding: 3px 7px;
+  color: var(--ink);
+}
+
+.chip[data-add='true'] {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--rule);
+  color: var(--muted);
+}
+
+.chip[data-add='true']:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.field {
+  font: inherit;
+  width: 100%;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 9px 10px;
+}
+
+textarea.field {
+  resize: vertical;
+  min-height: 66px;
+}
+
+select.field {
+  appearance: none;
+  cursor: pointer;
+  padding-right: 28px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) 52%,
+    calc(100% - 10px) 52%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+}
+
+.button {
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--ink);
+  color: var(--card);
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  padding: 12px 20px;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--deep);
+  border-color: var(--deep);
+}
+
+.button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ghost {
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 7px 12px;
+  color: var(--ink);
+}
+
+.ghost:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.ghost:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.mini {
+  font-family: var(--font-mono-family), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 4px 7px;
+  color: var(--muted);
+}
+
+.mini:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------------------ */
+/* Panels                                                              */
+/* ------------------------------------------------------------------ */
+
+.note-panel {
+  background: var(--card);
+  border-left: 2px solid var(--deep);
+  padding: 12px 14px;
+  font-size: 13.5px;
+}
+
+.tray {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tray-option {
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  padding: 5px 2px;
+  color: var(--ink);
+}
+
+.tray-option:last-child {
+  border-bottom: none;
+}
+
+.tray-option:hover {
+  color: var(--deep);
+}
+
+.tray-option span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ------------------------------------------------------------------ */
+/* The outline                                                         */
+/* ------------------------------------------------------------------ */
+
+.slab {
+  display: flex;
+  gap: 14px;
+  border-bottom: 1px solid var(--rule);
+  padding: 15px 0;
+}
+
+.slab[data-over='true'] {
+  border-top: 2px solid var(--deep);
+  padding-top: 13px;
+}
+
+.slab[data-dragging='true'] {
+  opacity: 0.4;
+}
+
+.slab[data-kind='objection'] .slab-role {
+  color: var(--deep);
+}
+
+.slab-role {
+  font-family: var(--font-mono-family), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  width: 84px;
+  flex: none;
+  padding-top: 4px;
+}
+
+.slab-heading {
+  font-family: var(--font-display-family), Georgia, serif;
+  letter-spacing: -0.01em;
+  margin: 2px 0 0;
+}
+
+.slab-heading[data-level='1'] {
+  font-size: 25px;
+  font-weight: 500;
+  line-height: 1.12;
+}
+
+.slab-heading[data-level='2'] {
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.slab-heading[data-blank='true'] {
+  color: var(--muted);
+  font-weight: 300;
+}
+
+.handle {
+  font-family: var(--font-mono-family), ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1;
+  cursor: grab;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: var(--muted);
+  padding: 4px 5px;
+  flex: none;
+  align-self: flex-start;
+}
+
+.handle:hover {
+  border-color: var(--rule);
+  color: var(--ink);
+}
+
+/* Headings only collapses every section to the H1 and the H2s. */
+.skim .slab-role,
+.skim .slab-note,
+.skim .slab-worries,
+.skim .handle {
+  display: none;
+}
+
+.skim .slab {
+  padding: 8px 0;
+  border-bottom: none;
+}
+
+@media (max-width: 520px) {
+  .slab-role {
+    width: 64px;
+  }
+}

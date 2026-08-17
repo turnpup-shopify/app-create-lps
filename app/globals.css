@@ -160,11 +160,11 @@ body {
   color: var(--mark-ink);
 }
 
+/* Still clickable. Clicking drops the row from the outline. */
 .pill[data-gone='true'] {
   text-decoration: line-through;
   color: var(--muted);
   border-style: dashed;
-  cursor: default;
 }
 
 .chip {
@@ -338,9 +338,15 @@ select.field {
   padding: 15px 0;
 }
 
-.slab[data-over='true'] {
+/* The line marks the edge the dragged section would land on. */
+.slab[data-over='before'] {
   border-top: 2px solid var(--deep);
   padding-top: 13px;
+}
+
+.slab[data-over='after'] {
+  border-bottom: 2px solid var(--deep);
+  padding-bottom: 13px;
 }
 
 .slab[data-dragging='true'] {

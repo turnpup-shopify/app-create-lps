@@ -227,6 +227,16 @@ export function Workbench({
     reorder(nudgeSection(sectionIds(sections), id, direction), id)
   }
 
+  /**
+   * Which edge of a section the dragged one would land on. Dragging down lands
+   * after the target, dragging up lands before it, so the line has to follow.
+   */
+  function dropEdgeFor(sectionId: string, index: number): 'before' | 'after' | null {
+    if (!dragId || overId !== sectionId || dragId === sectionId) return null
+    const from = sections.findIndex((section) => section.id === dragId)
+    return from > index ? 'before' : 'after'
+  }
+
   function dropOn(targetId: string) {
     const current = sectionIds(sections)
     if (!dragId || dragId === targetId) {
@@ -583,10 +593,10 @@ export function Workbench({
                       setDragId(null)
                       setOverId(null)
                     }}
-                    onDragOver={setOverId}
+                    onDragEnter={setOverId}
                     onDropOn={dropOn}
                     dragging={dragId === section.id}
-                    over={overId === section.id && dragId !== null && dragId !== section.id}
+                    over={dropEdgeFor(section.id, index)}
                   />
                 ))}
               </div>

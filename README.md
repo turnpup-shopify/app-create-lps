@@ -47,7 +47,33 @@ npm run build
 
 ## The repository sheet
 
-One Google Sheet holds everything a marketer edits. The app reads it and never writes to it. Publish it to the web as CSV and put the address in `SHEET_CSV_URL`.
+One Google Sheet holds everything a marketer edits. The app reads it and never writes to it.
+
+### Getting the `SHEET_CSV_URL`
+
+In the sheet: **File > Share > Publish to web**. In the first dropdown pick the **single tab** that holds the rows, not "Entire document" — CSV is only offered for one tab. In the second dropdown pick **Comma separated values (.csv)**, then **Publish**. Copy the address it gives you:
+
+```
+https://docs.google.com/spreadsheets/d/e/2PACX-1vAbC.../pub?gid=0&single=true&output=csv
+```
+
+Three things trip people up:
+
+- **That `/d/e/2PACX-...` id is not the id in your address bar.** Publishing mints a separate id. Copy the address out of the publish dialog rather than building one by hand.
+- **Publishing is not the same as sharing.** A sheet set to "anyone with the link can view" is still unpublished, and `output=csv` returns an error page until you publish. That is the failure the 502 message points at.
+- **`gid` selects the tab.** The publish dialog fills in the right one. If you later move the rows to a different tab, republish.
+
+The export form is a working alternative and needs no publishing, only "anyone with the link can view":
+
+```
+https://docs.google.com/spreadsheets/d/<SHEET_ID>/export?format=csv&gid=<TAB_GID>
+```
+
+Either way the address ends up in `SHEET_CSV_URL`. Both redirect, and the route follows redirects.
+
+**On staleness:** Google caches its own published CSV for a few minutes, and this app caches for five on top of that. "Refresh the sheet" clears the app's cache but not Google's, so a very fresh edit can take a couple of minutes to appear. That is Google, not this app.
+
+### Columns
 
 | column    | required     | meaning |
 | --------- | ------------ | ------- |
@@ -57,7 +83,9 @@ One Google Sheet holds everything a marketer edits. The app reads it and never w
 | `detail`  | no           | Supporting spec for a claim. For a worry, the reassurance we own. |
 | `tags`    | no           | Comma separated. Only used to pick the default insert position for a worry that gets its own section. |
 
-Extra columns are ignored. Rows whose `type` is empty or unrecognised are ignored.
+The header row must be the first row of the published tab, and the five names above must appear in it. Header names are trimmed and lowercased, so ` Type ` is fine. Extra columns are ignored, as are rows whose `type` is empty or unrecognised, so a notes column or a spacer row does no harm.
+
+Cells may contain commas. A `tags` cell holding more than one tag, or a `detail` cell holding a sentence with a comma, comes out of Google quoted (`"price, shipping"`) and papaparse reads it back correctly. Nothing needs escaping by hand in the sheet.
 
 `GET /api/repository` fetches, parses with papaparse, validates with zod and returns `{ products, claims, worries }`. Cached for five minutes; `?fresh=1` bypasses it. On failure it returns 502 with a message naming the likely cause and the sheet address, and the UI offers a paste box that parses pasted CSV client side into the same shape.
 

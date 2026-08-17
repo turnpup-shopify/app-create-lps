@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { isLate } from '@/lib/outline/placement'
 import { claimsInScope, inScope, parseRepositoryCsv, worriesInScope } from '@/lib/repository/parse'
 
 const SAMPLE = fs.readFileSync(path.join(process.cwd(), 'sample', 'repository.csv'), 'utf8')
@@ -51,6 +52,33 @@ describe('parseRepositoryCsv', () => {
   it('keeps duplicate labels distinct', () => {
     const parsed = parseRepositoryCsv('type,product,label\nclaim,x,Same\nclaim,x,Same\n')
     expect(parsed.claims[0].id).not.toBe(parsed.claims[1].id)
+  })
+
+  it('reads quoted cells, which is how a published sheet emits any cell holding a comma', () => {
+    const parsed = parseRepositoryCsv(
+      'type,product,label,detail,tags\n' +
+        'worry,*,"Feels expensive, honestly","Forty five days, no questions","price, shipping"\n',
+    )
+    expect(parsed.worries).toHaveLength(1)
+    expect(parsed.worries[0].label).toBe('Feels expensive, honestly')
+    expect(parsed.worries[0].detail).toBe('Forty five days, no questions')
+    expect(parsed.worries[0].tags).toBe('price, shipping')
+  })
+
+  it('reads a multi value tags cell as late', () => {
+    const parsed = parseRepositoryCsv('type,product,label,detail,tags\nworry,*,Too dear,We refund it,"trust, price"\n')
+    expect(isLate(parsed.worries[0])).toBe(true)
+  })
+
+  it('tolerates a trailing newline and blank rows', () => {
+    const parsed = parseRepositoryCsv('type,product,label\nclaim,x,One\n\n\nclaim,x,Two\n\n')
+    expect(parsed.claims).toHaveLength(2)
+  })
+
+  it('tolerates padded headers and mixed case', () => {
+    const parsed = parseRepositoryCsv(' Type , Product , Label , Detail , Tags \nclaim,x,Something,Support,\n')
+    expect(parsed.claims).toHaveLength(1)
+    expect(parsed.claims[0].detail).toBe('Support')
   })
 
   it('returns an empty repository for junk input rather than throwing', () => {

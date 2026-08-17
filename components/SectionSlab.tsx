@@ -14,7 +14,7 @@ export function SectionSlab({
   onNudge,
   onDragStart,
   onDragEnd,
-  onDragOver,
+  onDragEnter,
   onDropOn,
   dragging,
   over,
@@ -31,10 +31,11 @@ export function SectionSlab({
   onNudge: (id: string, direction: -1 | 1) => void
   onDragStart: (id: string) => void
   onDragEnd: () => void
-  onDragOver: (id: string) => void
+  onDragEnter: (id: string) => void
   onDropOn: (id: string) => void
   dragging: boolean
-  over: boolean
+  /** Which edge the dragged section would land on, or null when it is not over this one. */
+  over: 'before' | 'after' | null
 }) {
   const own = section.kind === 'objection'
   const level = section.level === 1 ? 'H1' : 'H2'
@@ -43,12 +44,13 @@ export function SectionSlab({
     <div
       className="slab"
       data-kind={section.kind}
-      data-over={over}
+      data-over={over ?? undefined}
       data-dragging={dragging}
-      onDragOver={(event) => {
-        event.preventDefault()
-        onDragOver(section.id)
-      }}
+      // Chromium fires dragenter repeatedly as the pointer travels but dragover
+      // only once, so the drop target is tracked on enter. dragover still has to
+      // call preventDefault or the drop never lands.
+      onDragEnter={() => onDragEnter(section.id)}
+      onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault()
         onDropOn(section.id)

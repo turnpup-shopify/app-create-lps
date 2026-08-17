@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { DEFAULT_AWARENESS, findStage, isAwarenessId, type AwarenessId } from './awareness'
+import { DEFAULT_FRAMEWORK, type Framework } from './framework'
 import { DEFAULT_GOAL, findGoal, isGoalId, type GoalId } from './goals'
 import { findSpine, isSpineId, type SpineId } from './spines'
 import type { Assignments, Claim, Product, Repository, Section, Worry } from './types'
@@ -53,23 +54,42 @@ export function emptyBrief(): Brief {
   }
 }
 
-/** Coerce anything read out of the database into a usable brief. */
+/**
+ * Coerce anything read out of the database into a usable brief.
+ *
+ * Stage, goal and spine ids are kept exactly as stored, even when they are not
+ * in the framework currently in force. The framework can come from the sheet,
+ * and the server has not read the sheet when this runs, so coercing here would
+ * quietly rewrite a brief to the built in defaults every time it was saved.
+ * The lookups fall back at render time instead, which is reversible.
+ */
 export function normalizeBrief(value: unknown): Brief {
   const parsed = BriefSchema.safeParse(value)
   if (!parsed.success) return emptyBrief()
-  const raw = parsed.data
+  return parsed.data
+}
+
+/** The stage, goal and spine a brief resolves to under a given framework. */
+export function resolveBrief(brief: Brief, framework: Framework = DEFAULT_FRAMEWORK) {
   return {
-    ...raw,
-    awareness: isAwarenessId(raw.awareness) ? raw.awareness : DEFAULT_AWARENESS,
-    goal: isGoalId(raw.goal) ? raw.goal : DEFAULT_GOAL,
-    spineOverride: isSpineId(raw.spineOverride) ? raw.spineOverride : '',
+    stage: findStage(brief.awareness, framework.awareness),
+    goal: findGoal(brief.goal, framework.goals),
+    spine: findSpine(activeSpine(brief, framework), framework.spines),
+    /** Empty when the stored override is not in this framework. */
+    override: isSpineId(brief.spineOverride, framework.spines) ? brief.spineOverride : '',
   }
 }
 
-/** The spine in force. The override never changes the lead. */
-export function activeSpine(brief: Pick<Brief, 'awareness' | 'spineOverride'>): SpineId {
-  if (brief.spineOverride) return brief.spineOverride
-  return findStage(brief.awareness).spine
+/**
+ * The spine in force. The override never changes the lead, and an override
+ * pointing at a spine the sheet no longer has falls back to the stage's own.
+ */
+export function activeSpine(
+  brief: Pick<Brief, 'awareness' | 'spineOverride'>,
+  framework: Framework = DEFAULT_FRAMEWORK,
+): SpineId {
+  if (brief.spineOverride && isSpineId(brief.spineOverride, framework.spines)) return brief.spineOverride
+  return findStage(brief.awareness, framework.awareness).spine
 }
 
 export interface MissingIds {
@@ -130,9 +150,14 @@ export interface HeadingBrief {
   }[]
 }
 
-export function toHeadingBrief(brief: Brief, repository: Repository, sections: Section[]): HeadingBrief {
-  const stage = findStage(brief.awareness)
-  const spine = findSpine(activeSpine(brief))
+export function toHeadingBrief(
+  brief: Brief,
+  repository: Repository,
+  sections: Section[],
+  framework: Framework = DEFAULT_FRAMEWORK,
+): HeadingBrief {
+  const stage = findStage(brief.awareness, framework.awareness)
+  const spine = findSpine(activeSpine(brief, framework), framework.spines)
   const claims = selectedClaims(brief, repository)
 
   return {
@@ -142,7 +167,7 @@ export function toHeadingBrief(brief: Brief, repository: Repository, sections: S
     awarenessStage: stage.label,
     leadInstruction: stage.lead,
     spine: spine.name,
-    pageGoal: findGoal(brief.goal).label,
+    pageGoal: findGoal(brief.goal, framework.goals).label,
     leadClaim: claims[0]?.label ?? null,
     claims: claims.map((claim) => ({ claim: claim.label, support: claim.detail })),
     slots: sections.map((section) => ({

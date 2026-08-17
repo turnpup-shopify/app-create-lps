@@ -5,17 +5,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PillRow } from './PillRow'
 import { RepositoryStep, type RepositorySource, type RepositoryStatus } from './RepositoryStep'
 import { SectionSlab } from './SectionSlab'
-import { AWARENESS, findStage } from '@/lib/outline/awareness'
 import {
   activeSpine,
   missingIds,
+  resolveBrief,
   selectedClaims,
   selectedWorries,
   toHeadingBrief,
   type Brief,
 } from '@/lib/outline/brief'
+import { DEFAULT_FRAMEWORK, type Framework, type FrameworkSources } from '@/lib/outline/framework'
 import { driftCount, missingHeadings, signatures, type Signatures } from '@/lib/outline/drift'
-import { GOALS, findGoal } from '@/lib/outline/goals'
 import { toMarkdown } from '@/lib/outline/markdown'
 import { moveSection, nudgeSection } from '@/lib/outline/order'
 import {
@@ -26,9 +26,9 @@ import {
   unplacedWorries,
   validSlotIds,
 } from '@/lib/outline/placement'
-import { SPINE_LIST, findSpine, type SpineId } from '@/lib/outline/spines'
 import { buildStructure, sectionIds } from '@/lib/outline/structure'
 import { emptyRepository, type Headings, type Repository } from '@/lib/outline/types'
+import type { TabProblem } from '@/lib/repository/framework-tabs'
 import { claimsInScope, parseRepositoryCsv, worriesInScope } from '@/lib/repository/parse'
 
 const COPY_FAILED = 'The outline could not be copied. Select it and copy it by hand.'
@@ -58,6 +58,9 @@ export function Workbench({
   const [pass, setPass] = useState<Signatures | null>(null)
 
   const [repository, setRepository] = useState<Repository>(emptyRepository)
+  const [framework, setFramework] = useState<Framework>(DEFAULT_FRAMEWORK)
+  const [sources, setSources] = useState<FrameworkSources | null>(null)
+  const [problems, setProblems] = useState<TabProblem[]>([])
   const [status, setStatus] = useState<RepositoryStatus>('loading')
   const [source, setSource] = useState<RepositorySource>(null)
   const [repoMessage, setRepoMessage] = useState<string | null>(null)
@@ -89,6 +92,11 @@ export function Workbench({
     try {
       const response = await fetch(`/api/repository${fresh ? '?fresh=1' : ''}`)
       const body = await response.json()
+      // The framework travels even on a failure, so a dead content tab does not
+      // also cost the writer their spines.
+      if (body.framework) setFramework(body.framework as Framework)
+      if (body.sources) setSources(body.sources as FrameworkSources)
+      setProblems(Array.isArray(body.problems) ? body.problems : [])
       if (!response.ok) {
         setStatus('failed')
         setRepoMessage(body.error ?? 'The sheet could not be read. Paste the rows below instead.')
@@ -125,9 +133,11 @@ export function Workbench({
   /* Derived                                                           */
   /* ---------------------------------------------------------------- */
 
-  const stage = findStage(brief.awareness)
-  const spineId = activeSpine(brief)
-  const spine = findSpine(spineId)
+  const resolved = resolveBrief(brief, framework)
+  const stage = resolved.stage
+  const spine = resolved.spine
+  const spineId = spine.id
+  const goal = resolved.goal
 
   const scopedClaims = useMemo(() => claimsInScope(repository, brief.products), [repository, brief.products])
   const scopedWorries = useMemo(() => worriesInScope(repository, brief.products), [repository, brief.products])
@@ -136,7 +146,7 @@ export function Workbench({
   const pickedWorries = useMemo(() => selectedWorries(brief, repository), [brief, repository])
   const gone = useMemo(() => missingIds(brief, repository), [brief, repository])
 
-  const valid = useMemo(() => validSlotIds({ spine: spineId }), [spineId])
+  const valid = useMemo(() => validSlotIds({ spine: spineId, framework }), [spineId, framework])
 
   const sections = useMemo(
     () =>
@@ -146,8 +156,9 @@ export function Workbench({
         worries: pickedWorries,
         assignments: brief.assignments,
         order: brief.order,
+        framework,
       }),
-    [spineId, brief.goal, brief.assignments, brief.order, pickedWorries],
+    [spineId, brief.goal, brief.assignments, brief.order, pickedWorries, framework],
   )
 
   const unplaced = useMemo(
@@ -258,7 +269,7 @@ export function Workbench({
     setHeadingError(null)
     setSkim(false)
 
-    const payload = toHeadingBrief({ ...brief, order: sectionIds(sections) }, repository, sections)
+    const payload = toHeadingBrief({ ...brief, order: sectionIds(sections) }, repository, sections, framework)
 
     try {
       const response = await fetch('/api/headings', {
@@ -367,6 +378,8 @@ export function Workbench({
               claims: repository.claims.length,
               worries: repository.worries.length,
             }}
+            sources={sources}
+            problems={problems}
             onRefresh={() => void load(true)}
             onReadPaste={readPaste}
           />
@@ -467,12 +480,10 @@ export function Workbench({
                 <select
                   id="awareness"
                   className="field"
-                  value={brief.awareness}
-                  onChange={(event) =>
-                    patch({ awareness: event.target.value as Brief['awareness'], spineOverride: '' })
-                  }
+                  value={stage.id}
+                  onChange={(event) => patch({ awareness: event.target.value, spineOverride: '' })}
                 >
-                  {AWARENESS.map((option) => (
+                  {framework.awareness.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.label}
                     </option>
@@ -486,10 +497,10 @@ export function Workbench({
                 <select
                   id="goal"
                   className="field"
-                  value={brief.goal}
-                  onChange={(event) => patch({ goal: event.target.value as Brief['goal'] })}
+                  value={goal.id}
+                  onChange={(event) => patch({ goal: event.target.value })}
                 >
-                  {GOALS.map((option) => (
+                  {framework.goals.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.label}
                     </option>
@@ -513,11 +524,11 @@ export function Workbench({
               <select
                 id="spine"
                 className="field"
-                value={brief.spineOverride}
-                onChange={(event) => patch({ spineOverride: event.target.value as SpineId | '' })}
+                value={resolved.override}
+                onChange={(event) => patch({ spineOverride: event.target.value })}
               >
                 <option value="">Keep the one the stage picked</option>
-                {SPINE_LIST.map((option) => (
+                {framework.spines.map((option) => (
                   <option key={option.id} value={option.id}>
                     {option.name}
                   </option>
@@ -650,7 +661,7 @@ export function Workbench({
               <p className="hint mt-3.5">
                 {skim
                   ? 'Read only these. If it argues, the outline is done. If it reads like a table of contents, the headings are still labels.'
-                  : `${sections.length} sections. ${placed} of ${pickedWorries.length} worries placed. Goal ${findGoal(brief.goal).label}.`}
+                  : `${sections.length} sections. ${placed} of ${pickedWorries.length} worries placed. Goal ${goal.label}.`}
               </p>
             </>
           )}

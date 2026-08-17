@@ -1,4 +1,4 @@
-export type SpineId = 'pas' | 'aida' | 'comparison' | 'bab' | 'story' | 'offer'
+export type SpineId = string
 
 export interface Slot {
   key: string
@@ -17,7 +17,8 @@ export interface Spine {
 /** Spine slot ids are namespaced so they never collide with a fixed slot. */
 export const spineSlotId = (key: string) => `spine-${key}`
 
-export const SPINES: Record<SpineId, Spine> = {
+/** Built in default. Spines and Slots tabs in the sheet override this. */
+export const SPINES: Record<string, Spine> = {
   pas: {
     id: 'pas',
     name: 'Problem Agitate Solution',
@@ -86,10 +87,10 @@ export const SPINES: Record<SpineId, Spine> = {
 
 export const SPINE_LIST: Spine[] = Object.values(SPINES)
 
-export function findSpine(id: string): Spine {
-  return SPINES[id as SpineId] ?? SPINES.pas
+export function findSpine(id: string, spines: Spine[] = SPINE_LIST): Spine {
+  return spines.find((spine) => spine.id === id) ?? spines[0] ?? SPINE_LIST[0]
 }
 
-export function isSpineId(value: unknown): value is SpineId {
-  return typeof value === 'string' && value in SPINES
+export function isSpineId(value: unknown, spines: Spine[] = SPINE_LIST): value is SpineId {
+  return typeof value === 'string' && spines.some((spine) => spine.id === value)
 }

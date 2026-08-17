@@ -1,6 +1,4 @@
-import type { SpineId } from './spines'
-
-export type AwarenessId = 'unaware' | 'problem' | 'solution' | 'product' | 'most'
+export type AwarenessId = string
 
 export interface AwarenessStage {
   id: AwarenessId
@@ -9,10 +7,11 @@ export interface AwarenessStage {
   lead: string
   /** Why that lead, in one or two sentences. */
   why: string
-  /** The spine the stage picks by default. */
-  spine: SpineId
+  /** The id of the spine the stage picks by default. */
+  spine: string
 }
 
+/** Built in default. An Awareness tab in the sheet overrides this. */
 export const AWARENESS: AwarenessStage[] = [
   {
     id: 'unaware',
@@ -53,10 +52,12 @@ export const AWARENESS: AwarenessStage[] = [
 
 export const DEFAULT_AWARENESS: AwarenessId = 'problem'
 
-export function findStage(id: string): AwarenessStage {
-  return AWARENESS.find((stage) => stage.id === id) ?? AWARENESS[1]
+export function findStage(id: string, stages: AwarenessStage[] = AWARENESS): AwarenessStage {
+  const found = stages.find((stage) => stage.id === id)
+  if (found) return found
+  return stages.find((stage) => stage.id === DEFAULT_AWARENESS) ?? stages[0] ?? AWARENESS[1]
 }
 
-export function isAwarenessId(value: unknown): value is AwarenessId {
-  return AWARENESS.some((stage) => stage.id === value)
+export function isAwarenessId(value: unknown, stages: AwarenessStage[] = AWARENESS): value is AwarenessId {
+  return typeof value === 'string' && stages.some((stage) => stage.id === value)
 }

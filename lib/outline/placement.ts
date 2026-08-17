@@ -1,15 +1,13 @@
-import { findSpine, spineSlotId, type SpineId } from './spines'
+import { DEFAULT_FRAMEWORK, DEFAULT_LATE_TAGS, type Framework } from './framework'
+import { findSpine, spineSlotId } from './spines'
 import type { Assignments, SlotId, Worry } from './types'
 
-/**
- * Money and risk worries sit after the price. Everything else sits before it.
- * Matched on substring, case insensitive.
- */
-export const LATE_TAGS = ['price', 'risk', 'money', 'guarantee', 'refund', 'shipping', 'warranty']
+/** Kept as a named export so the built in list stays greppable. */
+export const LATE_TAGS = DEFAULT_LATE_TAGS
 
-export function isLate(worry: Pick<Worry, 'tags'>): boolean {
+export function isLate(worry: Pick<Worry, 'tags'>, lateTags: string[] = DEFAULT_LATE_TAGS): boolean {
   const tags = (worry.tags ?? '').toLowerCase()
-  return LATE_TAGS.some((tag) => tags.includes(tag))
+  return lateTags.some((tag) => tags.includes(tag.toLowerCase()))
 }
 
 export const ownSectionId = (worryId: string) => `own-${worryId}`
@@ -19,9 +17,17 @@ export const ownSectionId = (worryId: string) => `own-${worryId}`
  * A worry pointing anywhere else is unplaced, which happens when the writer
  * overrides the spine after placing worries.
  */
-export function validSlotIds({ spine, goal }: { spine: SpineId | string; goal?: string }): Set<SlotId> {
+export function validSlotIds({
+  spine,
+  goal,
+  framework = DEFAULT_FRAMEWORK,
+}: {
+  spine: string
+  goal?: string
+  framework?: Framework
+}): Set<SlotId> {
   void goal
-  const resolved = findSpine(spine)
+  const resolved = findSpine(spine, framework.spines)
   const ids = new Set<SlotId>(resolved.slots.map((slot) => spineSlotId(slot.key)))
   ids.add('proof')
   ids.add('close')

@@ -1,0 +1,23 @@
+spine,key,position,role,job
+pas,problem,1,Problem,Name the pain in their words. No product yet.
+pas,agitate,2,Agitate,Show the cost of leaving it alone. Make the stakes concrete.
+pas,solution,3,Solution,Introduce the product as the release. Lead claim goes here.
+pas,how,4,How it works,Make the mechanism believable in three steps or fewer.
+aida,attention,1,Attention,"The single benefit, stated as a claim they can picture."
+aida,interest,2,Interest,Widen the benefit. What changes in their day.
+aida,desire,3,Desire,Proof plus specifics. Make wanting it feel safe.
+aida,how,4,How it works,Short mechanism so the benefit holds up.
+comparison,oldway,1,Why the usual fix fails,Retire the alternative without naming a brand.
+comparison,newway,2,The different approach,Name your method. One sentence a reader could repeat.
+comparison,how,3,How it works,"The mechanism. This is the whole argument, so give it room."
+comparison,sidebyside,4,Side by side,A table or split that makes the gap obvious.
+bab,before,1,Before,"Their world today, in detail, without judgment."
+bab,after,2,After,"Their world with it. Sensory, specific, not adjectives."
+bab,bridge,3,Bridge,The product as the crossing. Lead claim goes here.
+bab,how,4,How it works,Make the crossing believable.
+story,hook,1,Hook,A moment or a fact that stops them. No pitch.
+story,reveal,2,The hidden problem,Turn the moment into a problem they now recognize.
+story,stakes,3,What it costs,Why it matters more than they assumed.
+story,solution,4,The fix,First mention of the product. Lead claim goes here.
+offer,offer,1,The offer,What they get and what it costs. Nothing else.
+offer,whynow,2,Why now,One real reason to act today.

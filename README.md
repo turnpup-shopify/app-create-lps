@@ -15,12 +15,15 @@ The outline is the deliverable. There is no body copy generation, no publishing,
 ## Environment
 
 ```
-SHEET_CSV_URL      # Google Sheet published to the web as CSV. Read only.
+SHEET_ID           # Google Sheet holding the nine tabs. Read only. Preferred.
+SHEET_CSV_URL      # One published tab, the original layout. Used only when SHEET_ID is unset.
 ANTHROPIC_API_KEY  # server side only
 DATABASE_URL       # Postgres
 ```
 
 Copy `.env.example` to `.env.local` and fill it in.
+
+`SHEET_ID` wins when both are set. With neither, the app runs on the built in framework and offers the paste box.
 
 ## Running it locally
 
@@ -32,12 +35,14 @@ npm run dev
 
 `DATABASE_URL` can point at a local Postgres or a Neon dev branch. Without it the app still runs: the index page and the outline page explain that saved outlines are unavailable rather than crashing.
 
-For a sheet, either publish a real one or serve the bundled sample:
+For a sheet, either point at a real one or serve the bundled sample:
 
 ```bash
 cd sample && python3 -m http.server 8931
 # SHEET_CSV_URL=http://127.0.0.1:8931/repository.csv
 ```
+
+`sample/tabs/` holds the nine tab version of the same content. Every tab there reproduces the built in framework exactly, so it doubles as the template to copy into a real sheet. `tests/framework-tabs.test.ts` asserts that, which keeps the sample honest as the code changes.
 
 ```bash
 npm test          # domain unit tests
@@ -45,11 +50,133 @@ npm run typecheck
 npm run build
 ```
 
-## The repository sheet
+## The sheet
 
 One Google Sheet holds everything a marketer edits. The app reads it and never writes to it.
 
-### Getting the `SHEET_CSV_URL`
+There are two layouts. The **nine tab** layout is the one to use: it holds the content *and* the editorial framework, so the awareness stages, the spines, the section jobs and the late tag list are all editable without a deploy. The **single tab** layout came first, holds content only, and is still read when `SHEET_ID` is unset.
+
+### The nine tab layout
+
+Set `SHEET_ID` to the id in the address bar, or paste the whole address and the app will pull the id out of it:
+
+```
+https://docs.google.com/spreadsheets/d/<SHEET_ID>/edit#gid=0
+SHEET_ID=<SHEET_ID>
+```
+
+The sheet must be shared as **anyone with the link can view**. No publishing step is needed, because tabs are addressed by name rather than by `gid`:
+
+```
+https://docs.google.com/spreadsheets/d/<SHEET_ID>/gviz/tq?tqx=out:csv&sheet=Awareness
+```
+
+Tab names are exact and case sensitive. Three hold content, six hold the framework:
+
+| tab | holds | required |
+| --- | ----- | -------- |
+| `Products` | one row per product | yes |
+| `Claims` | one row per claim | yes |
+| `Worries` | one row per purchase worry | yes |
+| `Awareness` | the traffic stages, each with its lead and the spine it picks | no |
+| `Spines` | the argument shapes | no |
+| `Slots` | the ordered sections inside each spine | no |
+| `Goals` | the page goals and the close job each implies | no |
+| `Sections` | the roles and jobs of the sections the mechanism inserts | no |
+| `Settings` | single values, currently the late tag list | no |
+
+**Every framework tab is optional.** A missing one falls back to the built in value for that slice alone, and step one says which slices came from the sheet and which are built in. A sheet with only the three content tabs is a perfectly normal setup and reports no problems.
+
+#### Columns, tab by tab
+
+`Products`
+
+| column | required | meaning |
+| ------ | -------- | ------- |
+| `handle` | yes | The id. Referenced by the `product` column on claims and worries. |
+| `label` | yes | The short line on the pill. |
+| `detail` | no | Supporting line under the label. |
+
+`Claims` and `Worries`
+
+| column | required | meaning |
+| ------ | -------- | ------- |
+| `id` | no | Used verbatim when present. Leave it blank and an id is derived from the label. See below. |
+| `product` | no | The handle it belongs to. Blank or `*` means every product. |
+| `label` | yes | The claim, or the worry in customer voice. |
+| `answer` | no | Worries only. The reassurance we own. `detail` is accepted as the older name. |
+| `detail` | no | Claims only. The supporting spec. |
+| `tags` | no | Worries only. Comma separated. Picks the default insert position for a worry given its own section. |
+
+`Awareness`
+
+| column | required | meaning |
+| ------ | -------- | ------- |
+| `id` | yes | Stored in saved outlines, so keep it stable. |
+| `label` | yes | What the writer picks from. |
+| `lead` | yes | The lead instruction handed to the prompt. |
+| `why` | no | The reason shown under the picker. |
+| `spine` | yes | The `id` of a row in `Spines`. |
+
+`Spines`
+
+| column | required | meaning |
+| ------ | -------- | ------- |
+| `id` | yes | Referenced by `Awareness.spine` and `Slots.spine`. |
+| `name` | yes | The full name shown in the override picker. |
+| `note` | no | One line on when to reach for it. |
+
+`Slots`
+
+| column | required | meaning |
+| ------ | -------- | ------- |
+| `spine` | yes | The `id` of a row in `Spines`. |
+| `key` | yes | Unique within that spine. Two rows sharing one would collapse two sections into one. |
+| `position` | no | Sorts the slots. Rows with no position keep their sheet order. |
+| `role` | yes | The section role shown on the slab. |
+| `job` | no | What that section has to do. |
+
+`Goals`
+
+| column | required | meaning |
+| ------ | -------- | ------- |
+| `id` | yes | Stored in saved outlines. |
+| `label` | yes | What the writer picks from. |
+| `close job` | yes | What the close section has to do under this goal. |
+
+`Sections`
+
+| column | required | meaning |
+| ------ | -------- | ------- |
+| `id` | yes | One of `proof`, `offer`, `faq`, `close`, `own.early`, `own.late`. All six must be present. |
+| `role` | yes | The role shown on the slab. |
+| `job` | no | What it has to do. The close is deliberately blank, because the goal supplies its job. |
+
+`Settings`
+
+| column | required | meaning |
+| ------ | -------- | ------- |
+| `key` | yes | Currently only `late tags`. |
+| `value` | yes | For `late tags`, a comma separated list. A worry carrying one of these tags lands after the offer rather than before it. |
+
+#### When the sheet is wrong
+
+The framework is checked before it is used. A framework that would build a broken outline is rejected **whole** rather than half applied, the built in one takes over, and step one lists what to fix. The checks are:
+
+- a stage pointing at a spine no row defines
+- a spine with no slots
+- two slots in one spine sharing a key
+- a repeated `id` within a tab
+- a `Sections` tab missing one of the six required ids
+- a row missing a required column, named by its row number
+
+The rejection is whole because a half applied framework is harder to reason about than a known one. One consequence is worth stating plainly: **a `Spines` tab replaces the whole list, so it has to come with an `Awareness` tab that points into it.** Filling in `Spines` alone leaves the built in stages pointing at spines the sheet no longer has, and the whole thing falls back with a message naming the stage.
+
+### The single tab layout
+
+Used when `SHEET_CSV_URL` is set and `SHEET_ID` is not. It holds products, claims and worries in one flat table with a `type` column, and the framework is always the built in one.
+
+#### Getting the `SHEET_CSV_URL`
 
 In the sheet: **File > Share > Publish to web**. In the first dropdown pick the **single tab** that holds the rows, not "Entire document" — CSV is only offered for one tab. In the second dropdown pick **Comma separated values (.csv)**, then **Publish**. Copy the address it gives you:
 
@@ -73,7 +200,7 @@ Either way the address ends up in `SHEET_CSV_URL`. Both redirect, and the route 
 
 **On staleness:** Google caches its own published CSV for a few minutes, and this app caches for five on top of that. "Refresh the sheet" clears the app's cache but not Google's, so a very fresh edit can take a couple of minutes to appear. That is Google, not this app.
 
-### Columns
+#### Columns
 
 | column    | required     | meaning |
 | --------- | ------------ | ------- |
@@ -87,11 +214,19 @@ The header row must be the first row of the published tab, and the five names ab
 
 Cells may contain commas. A `tags` cell holding more than one tag, or a `detail` cell holding a sentence with a comma, comes out of Google quoted (`"price, shipping"`) and papaparse reads it back correctly. Nothing needs escaping by hand in the sheet.
 
-`GET /api/repository` fetches, parses with papaparse, validates with zod and returns `{ products, claims, worries }`. Cached for five minutes; `?fresh=1` bypasses it. On failure it returns 502 with a message naming the likely cause and the sheet address, and the UI offers a paste box that parses pasted CSV client side into the same shape.
+### The repository route
+
+`GET /api/repository` fetches every tab, parses with papaparse, validates with zod and returns `{ source, layout, sheet, products, claims, worries, framework, sources, problems }`. `sources` says where each framework slice came from, and `problems` is what to fix.
+
+Cached for five minutes; `?fresh=1` bypasses it, which is what "Refresh the sheet" uses. On failure it returns 502 with a message naming the likely cause, and the UI offers a paste box that parses pasted CSV client side into the same shape. A paste supplies content only and leaves the framework alone.
+
+A 502 still carries `framework` and `sources`, so a dead content tab does not also cost the writer their spines.
 
 ### Ids are derived, not positional
 
-Claim and worry ids are built from type, product scope and label (`claim.brass.pull.ages.instead.of.chipping`). Inserting a row above them in the sheet does not orphan every saved outline below it. Renaming a `label` does orphan that row, which shows in the UI as a struck pill rather than crashing or being silently dropped.
+Claim and worry ids are built from type, product scope and label (`claim.brass.pull.ages.instead.of.chipping`). Inserting a row above them in the sheet does not orphan every saved outline below it.
+
+Renaming a `label` does orphan that row, because the id was built from the label. It shows in the UI as a struck pill rather than crashing or being silently dropped. **Fill in the optional `id` column to avoid that**: an id given in the sheet is used verbatim, so the label becomes free to reword. Worth doing before a sheet has saved outlines pointing into it, since adding an id later changes the id and orphans the old one exactly as a rename would.
 
 ## Where the logic lives
 
@@ -99,10 +234,11 @@ Claim and worry ids are built from type, product scope and label (`claim.brass.p
 
 | file                 | what it owns |
 | -------------------- | ------------ |
-| `awareness.ts`       | The five stages. Each carries the lead and the reason for it, plus the spine it picks. |
-| `spines.ts`          | Six spines, each an ordered list of slots with a role and a job. |
-| `goals.ts`           | The four page goals and the close job each one implies. |
-| `placement.ts`       | The late tag list, which slots a worry may sit in, and assign / unassign. |
+| `framework.ts`       | The `Framework` type and the built in defaults, which are what a sheet tab overrides. |
+| `awareness.ts`       | The five built in stages. Each carries the lead and the reason for it, plus the spine it picks. |
+| `spines.ts`          | Six built in spines, each an ordered list of slots with a role and a job. |
+| `goals.ts`           | The four built in page goals and the close job each one implies. |
+| `placement.ts`       | Which slots a worry may sit in, and assign / unassign. The late tag list it consults comes from the framework. |
 | `structure.ts`       | `buildStructure` assembles the ordered sections. |
 | `order.ts`           | Reconciling a stored manual order against a changed section set. |
 | `drift.ts`           | How many sections drifted since the last heading pass. |
@@ -110,6 +246,17 @@ Claim and worry ids are built from type, product scope and label (`claim.brass.p
 | `markdown.ts`        | Copy as markdown, with heading levels intact. |
 | `brief.ts`           | What a saved outline stores, and the JSON block the prompt receives. |
 | `headings-reply.ts`  | Turning a model reply into headings, or `null` so the caller retries. |
+
+`lib/repository/` reads the sheet.
+
+| file                 | what it owns |
+| -------------------- | ------------ |
+| `sheet.ts`           | The tab names, which layout is in force, and the address of each tab. |
+| `csv.ts`             | Reading rows and naming columns, tolerant of header case and spacing. |
+| `parse.ts`           | The content tabs, and the id rule. |
+| `framework-tabs.ts`  | The framework tabs, the cross checks, and the fallback. |
+
+The framework is threaded through the domain functions as an optional last argument defaulting to the built in one, so every pure function stays callable without a sheet and the existing tests keep working as written.
 
 Two behaviours are worth knowing because they are judgement calls, not consequences of the spec:
 
@@ -130,6 +277,8 @@ The punctuation rule (no hyphens, dashes, semicolons or colons in any heading or
 ## Saved outlines
 
 One table. `brief` stores ids, never labels, so a sheet edit flows through.
+
+Stage, goal and spine ids are stored exactly as chosen, even when the framework currently in force has no such id. The server has not read the sheet when a brief is loaded, so coercing there would quietly rewrite a sheet defined stage to a built in default on every save. The fallback happens at render time instead, where it is reversible: fix the sheet and the outline points at the right stage again.
 
 ```
 outlines
@@ -167,3 +316,5 @@ Interface copy follows the same house rules as the headings: no hyphens, dashes,
 - One worry belongs to one section. Repeating a reassurance in two places is a real tactic and this model forbids it.
 - The first selected claim becomes the lead claim. There is no explicit lead picker.
 - The sheet is read only from the app. That keeps a single source of truth and costs the writer a context switch to add a claim.
+- The framework tabs hold the editorial layer only. Assembly order, the prompt and the punctuation scrub stay in code, because they are mechanism rather than opinion and a sheet edit could break an outline in ways a writer could not diagnose.
+- A framework that fails a cross check is rejected whole rather than in part. The alternative, applying the good tabs and falling back on the bad ones, produces combinations nobody chose.

@@ -4,6 +4,7 @@ import {
   emptyBrief,
   missingIds,
   normalizeBrief,
+  resolveBrief,
   selectedClaims,
   toHeadingBrief,
 } from '@/lib/outline/brief'
@@ -22,12 +23,12 @@ describe('activeSpine', () => {
 })
 
 describe('normalizeBrief', () => {
-  it('fills in a usable brief from junk', () => {
-    const brief = normalizeBrief({ awareness: 'nonsense', goal: 'nonsense', spineOverride: 'nonsense' })
+  it('fills in the missing fields', () => {
+    const brief = normalizeBrief({})
+    expect(brief.products).toEqual([])
+    expect(brief.assignments).toEqual({})
     expect(brief.awareness).toBe('problem')
     expect(brief.goal).toBe('buy')
-    expect(brief.spineOverride).toBe('')
-    expect(brief.products).toEqual([])
   })
 
   it('keeps valid values', () => {
@@ -35,6 +36,37 @@ describe('normalizeBrief', () => {
     expect(brief.awareness).toBe('most')
     expect(brief.goal).toBe('quote')
     expect(brief.spineOverride).toBe('bab')
+  })
+
+  it('keeps ids the built in framework does not have, because the sheet may', () => {
+    // Coercing here would rewrite a sheet defined stage to the built in default
+    // on every save, and the loss would not be recoverable.
+    const brief = normalizeBrief({ awareness: 'skimmer', goal: 'trial', spineOverride: 'pastor' })
+    expect(brief.awareness).toBe('skimmer')
+    expect(brief.goal).toBe('trial')
+    expect(brief.spineOverride).toBe('pastor')
+  })
+
+  it('falls back to an empty brief for something that is not a brief', () => {
+    expect(normalizeBrief('nonsense').products).toEqual([])
+    expect(normalizeBrief(null).awareness).toBe('problem')
+  })
+})
+
+describe('resolveBrief', () => {
+  it('falls back at render time rather than rewriting the brief', () => {
+    const brief = { ...emptyBrief(), awareness: 'skimmer', goal: 'trial', spineOverride: 'pastor' }
+    const resolved = resolveBrief(brief)
+    expect(resolved.stage.id).toBe('problem')
+    expect(resolved.goal.id).toBe('buy')
+    expect(resolved.override).toBe('')
+    // and the brief itself is untouched
+    expect(brief.awareness).toBe('skimmer')
+  })
+
+  it('uses a valid override and ignores an unknown one', () => {
+    expect(resolveBrief({ ...emptyBrief(), spineOverride: 'bab' }).spine.id).toBe('bab')
+    expect(resolveBrief({ ...emptyBrief(), awareness: 'unaware', spineOverride: 'nope' }).spine.id).toBe('story')
   })
 })
 

@@ -53,6 +53,8 @@ The address being right is only half of it. A fresh database has no tables, beca
 npm run db:push      # or psql "$DATABASE_URL" -f drizzle/0000_outlines.sql
 ```
 
+`db:push` reads the same four variable names the app does, so it works on a deployment that only has `POSTGRES_URL`. On a hosted database with no local setup, pasting `drizzle/0000_outlines.sql` into the provider's SQL editor does the same job. The migration is `CREATE TABLE IF NOT EXISTS`, so running it twice is safe.
+
 The interface names the cause rather than repeating "check the database address" at everything. A missing table, a database that does not exist, a refused user or password, a host that cannot be found, a refused connection, no connection slots left, and both directions of TLS failure each get their own sentence and their own next step. The raw driver error goes to the server log as `[db] ... failed`, which is where to look when the sentence says only to check the address.
 
 One wrinkle worth knowing if you touch that code: Drizzle wraps the driver error, so the SQLSTATE is on `error.cause` rather than on the error itself. Reading only the outer error sends every failure to the generic sentence.

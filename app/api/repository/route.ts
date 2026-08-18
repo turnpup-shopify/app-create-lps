@@ -7,7 +7,7 @@ import {
   parseRepositoryCsv,
   parseWorriesTab,
 } from '@/lib/repository/parse'
-import { CONTENT_TABS, TAB_NAMES, sheetMode, tabUrl, type TabKey } from '@/lib/repository/sheet'
+import { CONTENT_TABS, TAB_NAMES, isPublishId, sheetMode, tabUrl, type TabKey } from '@/lib/repository/sheet'
 import { NextResponse } from 'next/server'
 
 const NOT_CONFIGURED =
@@ -18,6 +18,9 @@ const UNREACHABLE =
 
 const NO_CONTENT =
   'The sheet loaded but held no products, claims or worries. Check the tab names and the header rows.'
+
+const PUBLISH_ID =
+  'SHEET_ID holds a published id rather than the id of the sheet. Publishing mints a separate one, and it can only address tabs by number rather than by name. Copy the id out of the address bar of the sheet, the part between d and edit, then reload.'
 
 const REVALIDATE = 300
 
@@ -97,6 +100,15 @@ export async function GET(request: Request) {
 
   /* ---------------- the nine tab layout ---------------- */
   const sheetId = process.env.SHEET_ID!
+
+  // Fail on the actual mistake rather than making ten doomed requests and
+  // blaming the sharing settings.
+  if (isPublishId(sheetId)) {
+    return NextResponse.json(
+      { error: PUBLISH_ID, sheet: sheetId, framework: DEFAULT_FRAMEWORK, sources: ALL_BUILT_IN, problems: [] },
+      { status: 502 },
+    )
+  }
   const keys = Object.keys(TAB_NAMES) as TabKey[]
 
   const fetched = await Promise.all(

@@ -52,6 +52,16 @@ export function sheetsHost(env: NodeJS.ProcessEnv = process.env): string {
   return (env.SHEET_BASE_URL || SHEETS_HOST).replace(/\/+$/, '')
 }
 
+/**
+ * Publishing to the web mints a separate id, the `2PACX-` one. It is a real id
+ * and it does serve CSV, but only per tab by `gid` number, never by tab name,
+ * so the gviz address tabs are read from cannot use it. Catching that here turns
+ * an obscure unreachable sheet into a sentence naming the actual mistake.
+ */
+export function isPublishId(value: string): boolean {
+  return /^2PACX-/i.test(readSheetId(value))
+}
+
 export function tabUrl(sheetId: string, tab: string, env: NodeJS.ProcessEnv = process.env): string {
   const id = readSheetId(sheetId)
   return `${sheetsHost(env)}/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`

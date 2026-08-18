@@ -3,6 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { isLate } from '@/lib/outline/placement'
 import { claimsInScope, inScope, parseRepositoryCsv, worriesInScope } from '@/lib/repository/parse'
+import { isPublishId } from '@/lib/repository/sheet'
 
 const SAMPLE = fs.readFileSync(path.join(process.cwd(), 'sample', 'repository.csv'), 'utf8')
 
@@ -113,5 +114,21 @@ describe('scope', () => {
     expect(inScope({ product: '' }, [])).toBe(true)
     expect(inScope({ product: '*' }, ['anything'])).toBe(true)
     expect(inScope({ product: 'other' }, ['anything'])).toBe(false)
+  })
+})
+
+describe('a published id is not a sheet id', () => {
+  it('recognises the 2PACX form, however it arrives', () => {
+    const url =
+      'https://docs.google.com/spreadsheets/d/e/2PACX-1vSLqwR_j9-e9hMLZqhNaSgttbUUOP-CgDRcddizu9TBcjOBMLq7nm/pub?output=csv'
+    expect(isPublishId(url)).toBe(true)
+    expect(isPublishId('2PACX-1vSLqwR_j9-e9hMLZqhNaSgttbUUOP')).toBe(true)
+  })
+
+  it('leaves a real sheet id alone', () => {
+    expect(isPublishId('1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms')).toBe(false)
+    expect(
+      isPublishId('https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit#gid=0'),
+    ).toBe(false)
   })
 })

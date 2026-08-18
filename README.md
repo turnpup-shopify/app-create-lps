@@ -225,6 +225,10 @@ https://docs.google.com/spreadsheets/d/<SHEET_ID>/export?format=csv&gid=<TAB_GID
 
 Either way the address ends up in `SHEET_CSV_URL`. Both redirect, and the route follows redirects.
 
+**A published address can serve more than one tab, but only by number.** Publishing the entire document and appending `&gid=<TAB_GID>` returns that tab as CSV. What it cannot do is address a tab by name, which is what the nine tab layout relies on, because tab names are only available on the `gviz` endpoint and that needs the real sheet id. So a publish address is a fine way to read one tab and not a way to read nine.
+
+**Do not put a published id in `SHEET_ID`.** Publishing mints a separate `2PACX-` id, and `readSheetId` will happily pull it out of the address while `gviz` rejects it. The route now recognises that case and says so, rather than reporting an unreachable sheet and sending you to check the sharing settings.
+
 **On staleness:** Google caches its own published CSV for a few minutes, and this app caches for five on top of that. "Refresh the sheet" clears the app's cache but not Google's, so a very fresh edit can take a couple of minutes to appear. That is Google, not this app.
 
 #### Columns

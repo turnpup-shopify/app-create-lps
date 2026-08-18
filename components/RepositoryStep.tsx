@@ -83,7 +83,10 @@ export function RepositoryStep({
           {fromSheet.length === 0
             ? problems.length > 0
               ? 'Using the built in framework. What the sheet holds could not be used, so read the list below.'
-              : 'Using the built in framework. The sheet supplied no stages, spines or section jobs.'
+              : source === null
+                ? // No sheet was read at all, so blaming one for holding nothing would be wrong.
+                  'Using the built in framework, which is everything you need to build an outline.'
+                : 'Using the built in framework. The sheet supplied no stages, spines or section jobs.'
             : fromBuiltIn.length === 0
               ? 'Framework from the sheet.'
               : `Framework from the sheet for ${fromSheet.map(([, label]) => label).join(', ')}. Built in for ${fromBuiltIn

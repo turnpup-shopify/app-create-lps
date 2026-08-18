@@ -1,12 +1,9 @@
 import { desc } from 'drizzle-orm'
 import Link from 'next/link'
 import { OutlineList } from '@/components/OutlineList'
-import { getDb, hasDatabase, outlines, missingUrlReason } from '@/lib/db'
+import { describeDbError, getDb, hasDatabase, logDbError, outlines, missingUrlReason } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
-
-
-const UNREADABLE = 'The saved outlines could not be read. Check the database address, then reload.'
 
 const dateFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -27,8 +24,9 @@ export default async function IndexPage() {
         name: row.name,
         date: dateFormat.format(row.updatedAt),
       }))
-    } catch {
-      error = UNREADABLE
+    } catch (failure) {
+      logDbError('reading the outline list', failure)
+      error = describeDbError(failure)
     }
   }
 

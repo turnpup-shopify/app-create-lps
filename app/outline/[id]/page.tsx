@@ -2,13 +2,11 @@ import { eq } from 'drizzle-orm'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Workbench } from '@/components/Workbench'
-import { getDb, hasDatabase, missingUrlReason, outlines } from '@/lib/db'
+import { describeDbError, getDb, hasDatabase, logDbError, missingUrlReason, outlines } from '@/lib/db'
 import { normalizeBrief } from '@/lib/outline/brief'
 import type { Headings } from '@/lib/outline/types'
 
 export const dynamic = 'force-dynamic'
-
-const UNREADABLE = 'This outline could not be read. Check the database address, then reload.'
 
 function Problem({ message }: { message: string }) {
   return (
@@ -31,8 +29,9 @@ export default async function OutlinePage({ params }: { params: Promise<{ id: st
   try {
     const found = await getDb().select().from(outlines).where(eq(outlines.id, id)).limit(1)
     row = found[0]
-  } catch {
-    return <Problem message={UNREADABLE} />
+  } catch (failure) {
+    logDbError('reading an outline', failure)
+    return <Problem message={describeDbError(failure, 'This outline could not be read')} />
   }
 
   if (!row) notFound()

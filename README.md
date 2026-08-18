@@ -45,6 +45,18 @@ DATABASE_URL  POSTGRES_URL  POSTGRES_PRISMA_URL  POSTGRES_URL_NON_POOLING
 
 A value that is not a postgres address is skipped rather than handed to the driver, and the interface says which variable was wrong.
 
+### When the database is there but the query fails
+
+The address being right is only half of it. A fresh database has no tables, because creating one and migrating it are separate steps, so the first thing to try is:
+
+```bash
+npm run db:push      # or psql "$DATABASE_URL" -f drizzle/0000_outlines.sql
+```
+
+The interface names the cause rather than repeating "check the database address" at everything. A missing table, a database that does not exist, a refused user or password, a host that cannot be found, a refused connection, no connection slots left, and both directions of TLS failure each get their own sentence and their own next step. The raw driver error goes to the server log as `[db] ... failed`, which is where to look when the sentence says only to check the address.
+
+One wrinkle worth knowing if you touch that code: Drizzle wraps the driver error, so the SQLSTATE is on `error.cause` rather than on the error itself. Reading only the outer error sends every failure to the generic sentence.
+
 **`SUPABASE_URL` is not a database address.** It holds the REST endpoint (`https://<project>.supabase.co`), not a connection string, so it is never used here. The Supabase connection string is in the dashboard under **Project settings > Database > Connection string**. Take the **transaction pooler** one on port 6543 for serverless, which this app is already set up for: it opens one connection with `prepare: false`, which that pooler requires.
 
 For a sheet, either point at a real one or serve the bundled sample:

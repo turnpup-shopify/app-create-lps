@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
-import { getDb, hasDatabase, outlines, missingUrlReason } from '@/lib/db'
+import { describeDbError, getDb, hasDatabase, logDbError, outlines, missingUrlReason } from '@/lib/db'
 import { normalizeBrief } from '@/lib/outline/brief'
 import { SavedOutlineSchema, type SavedOutlineInput } from '@/lib/outline/saved'
 
@@ -38,11 +38,9 @@ export async function PUT(request: Request, { params }: Params) {
 
     if (!row) return NextResponse.json({ error: NOT_FOUND }, { status: 404 })
     return NextResponse.json({ outline: row })
-  } catch {
-    return NextResponse.json(
-      { error: 'The outline could not be saved. Check the database address and try again.' },
-      { status: 500 },
-    )
+  } catch (failure) {
+    logDbError('updating an outline', failure)
+    return NextResponse.json({ error: describeDbError(failure, 'The outline could not be saved') }, { status: 500 })
   }
 }
 
@@ -54,10 +52,8 @@ export async function DELETE(_request: Request, { params }: Params) {
     const [row] = await getDb().delete(outlines).where(eq(outlines.id, id)).returning({ id: outlines.id })
     if (!row) return NextResponse.json({ error: NOT_FOUND }, { status: 404 })
     return NextResponse.json({ deleted: row.id })
-  } catch {
-    return NextResponse.json(
-      { error: 'The outline could not be deleted. Check the database address and try again.' },
-      { status: 500 },
-    )
+  } catch (failure) {
+    logDbError('deleting an outline', failure)
+    return NextResponse.json({ error: describeDbError(failure, 'The outline could not be deleted') }, { status: 500 })
   }
 }

@@ -6,6 +6,7 @@ import { findDatabaseUrl, missingUrlReason } from './url'
 export { outlines }
 export type { OutlineRow } from './schema'
 export { findDatabaseUrl, missingUrlReason, URL_NAMES } from './url'
+export { describeDbError, logDbError } from './errors'
 
 type Db = ReturnType<typeof drizzle<{ outlines: typeof outlines }>>
 

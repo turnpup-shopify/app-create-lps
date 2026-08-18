@@ -1,6 +1,6 @@
 import { desc } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
-import { getDb, hasDatabase, outlines, missingUrlReason } from '@/lib/db'
+import { describeDbError, getDb, hasDatabase, logDbError, outlines, missingUrlReason } from '@/lib/db'
 import { normalizeBrief } from '@/lib/outline/brief'
 import { SavedOutlineSchema, type SavedOutlineInput } from '@/lib/outline/saved'
 
@@ -20,11 +20,9 @@ export async function GET() {
       .orderBy(desc(outlines.updatedAt))
 
     return NextResponse.json({ outlines: rows })
-  } catch {
-    return NextResponse.json(
-      { error: 'The saved outlines could not be read. Check the database address and try again.' },
-      { status: 500 },
-    )
+  } catch (failure) {
+    logDbError('listing outlines', failure)
+    return NextResponse.json({ error: describeDbError(failure) }, { status: 500 })
   }
 }
 
@@ -54,10 +52,8 @@ export async function POST(request: Request) {
       .returning()
 
     return NextResponse.json({ outline: row }, { status: 201 })
-  } catch {
-    return NextResponse.json(
-      { error: 'The outline could not be saved. Check the database address and try again.' },
-      { status: 500 },
-    )
+  } catch (failure) {
+    logDbError('saving an outline', failure)
+    return NextResponse.json({ error: describeDbError(failure, 'The outline could not be saved') }, { status: 500 })
   }
 }

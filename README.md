@@ -18,7 +18,7 @@ The outline is the deliverable. There is no body copy generation, no publishing,
 SHEET_ID           # Google Sheet holding the nine tabs. Read only. Preferred.
 SHEET_CSV_URL      # One published tab, the original layout. Used only when SHEET_ID is unset.
 ANTHROPIC_API_KEY  # server side only
-DATABASE_URL       # Postgres
+DATABASE_URL       # Postgres. POSTGRES_URL is read too, see below.
 ```
 
 Copy `.env.example` to `.env.local` and fill it in.
@@ -33,7 +33,19 @@ npm run db:push      # or psql -f drizzle/0000_outlines.sql
 npm run dev
 ```
 
-`DATABASE_URL` can point at a local Postgres or a Neon dev branch. Without it the app still runs: the index page and the outline page explain that saved outlines are unavailable rather than crashing.
+`DATABASE_URL` can point at a local Postgres, a Neon dev branch or a Supabase project. Without it the app still runs: the index page and the outline page explain that saved outlines are unavailable rather than crashing, and everything except saving works.
+
+### Which variable holds the address
+
+Nothing sets `DATABASE_URL` by itself. The Vercel Postgres and Supabase integrations both write `POSTGRES_URL`, so a deployment that looks correctly configured in the dashboard would report no database at all if that were the only name read. Four names are tried in order, first usable one wins:
+
+```
+DATABASE_URL  POSTGRES_URL  POSTGRES_PRISMA_URL  POSTGRES_URL_NON_POOLING
+```
+
+A value that is not a postgres address is skipped rather than handed to the driver, and the interface says which variable was wrong.
+
+**`SUPABASE_URL` is not a database address.** It holds the REST endpoint (`https://<project>.supabase.co`), not a connection string, so it is never used here. The Supabase connection string is in the dashboard under **Project settings > Database > Connection string**. Take the **transaction pooler** one on port 6543 for serverless, which this app is already set up for: it opens one connection with `prepare: false`, which that pooler requires.
 
 For a sheet, either point at a real one or serve the bundled sample:
 

@@ -1,34 +1,37 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { outlines } from './schema'
+import { findDatabaseUrl, missingUrlReason } from './url'
 
 export { outlines }
 export type { OutlineRow } from './schema'
+export { findDatabaseUrl, missingUrlReason, URL_NAMES } from './url'
 
 type Db = ReturnType<typeof drizzle<{ outlines: typeof outlines }>>
 
 let cached: Db | null = null
 
 export function hasDatabase(): boolean {
-  return Boolean(process.env.DATABASE_URL)
+  return findDatabaseUrl() !== null
 }
 
 export class MissingDatabaseError extends Error {
-  constructor() {
-    super('DATABASE_URL is not set, so saved outlines cannot be read or written. Add it to the environment and reload.')
+  constructor(message: string = missingUrlReason()) {
+    super(message)
     this.name = 'MissingDatabaseError'
   }
 }
 
 /**
  * One connection, reused across requests. `prepare: false` keeps this working
- * behind a pooler, which is how Vercel Postgres and Neon are usually reached.
+ * behind a pooler, which is how Vercel Postgres, Supabase and Neon are usually
+ * reached, and is required by the Supabase transaction mode pooler.
  */
 export function getDb(): Db {
-  const url = process.env.DATABASE_URL
-  if (!url) throw new MissingDatabaseError()
+  const found = findDatabaseUrl()
+  if (!found) throw new MissingDatabaseError()
   if (cached) return cached
-  const client = postgres(url, { max: 1, prepare: false })
+  const client = postgres(found.url, { max: 1, prepare: false })
   cached = drizzle(client, { schema: { outlines } })
   return cached
 }

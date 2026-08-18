@@ -1,18 +1,16 @@
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
-import { getDb, hasDatabase, outlines } from '@/lib/db'
+import { getDb, hasDatabase, outlines, missingUrlReason } from '@/lib/db'
 import { normalizeBrief } from '@/lib/outline/brief'
 import { SavedOutlineSchema, type SavedOutlineInput } from '@/lib/outline/saved'
 
-const NO_DB =
-  'Saved outlines are unavailable because no database address is set. Add DATABASE_URL to the environment and reload.'
 
 const NOT_FOUND = 'That outline is not in the database. It may have been deleted in another tab.'
 
 type Params = { params: Promise<{ id: string }> }
 
 export async function PUT(request: Request, { params }: Params) {
-  if (!hasDatabase()) return NextResponse.json({ error: NO_DB }, { status: 503 })
+  if (!hasDatabase()) return NextResponse.json({ error: missingUrlReason() }, { status: 503 })
   const { id } = await params
 
   let body: SavedOutlineInput
@@ -49,7 +47,7 @@ export async function PUT(request: Request, { params }: Params) {
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
-  if (!hasDatabase()) return NextResponse.json({ error: NO_DB }, { status: 503 })
+  if (!hasDatabase()) return NextResponse.json({ error: missingUrlReason() }, { status: 503 })
   const { id } = await params
 
   try {

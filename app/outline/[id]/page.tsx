@@ -2,14 +2,11 @@ import { eq } from 'drizzle-orm'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Workbench } from '@/components/Workbench'
-import { getDb, hasDatabase, outlines } from '@/lib/db'
+import { getDb, hasDatabase, missingUrlReason, outlines } from '@/lib/db'
 import { normalizeBrief } from '@/lib/outline/brief'
 import type { Headings } from '@/lib/outline/types'
 
 export const dynamic = 'force-dynamic'
-
-const NO_DB =
-  'This outline cannot be read because no database address is set. Add DATABASE_URL to the environment and reload.'
 
 const UNREADABLE = 'This outline could not be read. Check the database address, then reload.'
 
@@ -28,7 +25,7 @@ function Problem({ message }: { message: string }) {
 export default async function OutlinePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  if (!hasDatabase()) return <Problem message={NO_DB} />
+  if (!hasDatabase()) return <Problem message={missingUrlReason('This outline cannot be read')} />
 
   let row: { id: string; name: string; brief: unknown; headings: unknown } | undefined
   try {

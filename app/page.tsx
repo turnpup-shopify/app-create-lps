@@ -1,12 +1,10 @@
 import { desc } from 'drizzle-orm'
 import Link from 'next/link'
 import { OutlineList } from '@/components/OutlineList'
-import { getDb, hasDatabase, outlines } from '@/lib/db'
+import { getDb, hasDatabase, outlines, missingUrlReason } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-const NO_DB =
-  'Saved outlines are unavailable because no database address is set. Add DATABASE_URL to the environment and reload.'
 
 const UNREADABLE = 'The saved outlines could not be read. Check the database address, then reload.'
 
@@ -17,7 +15,7 @@ export default async function IndexPage() {
   let error: string | null = null
 
   if (!hasDatabase()) {
-    error = NO_DB
+    error = missingUrlReason()
   } else {
     try {
       const found = await getDb()

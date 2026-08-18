@@ -26,8 +26,8 @@ import {
   unplacedWorries,
   validSlotIds,
 } from '@/lib/outline/placement'
-import { buildStructure, sectionIds } from '@/lib/outline/structure'
-import { emptyRepository, type Headings, type Repository } from '@/lib/outline/types'
+import { buildStructure, heroId, sectionIds } from '@/lib/outline/structure'
+import { emptyHeading, emptyRepository, type Headings, type Repository } from '@/lib/outline/types'
 import type { TabProblem } from '@/lib/repository/framework-tabs'
 import { claimsInScope, parseRepositoryCsv, worriesInScope } from '@/lib/repository/parse'
 
@@ -235,7 +235,7 @@ export function Workbench({
   }
 
   function nudge(id: string, direction: -1 | 1) {
-    reorder(nudgeSection(sectionIds(sections), id, direction), id)
+    reorder(nudgeSection(sectionIds(sections), id, direction, heroId(sections)), id)
   }
 
   /**
@@ -255,7 +255,7 @@ export function Workbench({
       setOverId(null)
       return
     }
-    reorder(moveSection(current, dragId, current.indexOf(targetId)), dragId)
+    reorder(moveSection(current, dragId, current.indexOf(targetId), heroId(sections)), dragId)
     setDragId(null)
     setOverId(null)
   }
@@ -284,7 +284,10 @@ export function Workbench({
 
       if (written.length > 0) {
         const next: Headings = {}
-        for (const entry of written) next[entry.id] = { heading: entry.heading, note: entry.note }
+        // The copy fields stay empty until the copy pass writes them.
+        for (const entry of written) {
+          next[entry.id] = { ...emptyHeading(), heading: entry.heading, note: entry.note }
+        }
         setHeadings(next)
         setPass(signatures(sections))
         if (body.error) setHeadingError(body.error)

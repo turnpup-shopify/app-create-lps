@@ -13,7 +13,12 @@
  * section lands where it belongs relative to its neighbours rather than in the
  * middle of the spine slots.
  */
-export function reconcileOrder(baseIds: string[], stored: string[] | undefined | null): string[] {
+export function reconcileOrder(
+  baseIds: string[],
+  stored: string[] | undefined | null,
+  /** The section that owns the H1. Forced first, whatever the stored order says. */
+  hero?: string,
+): string[] {
   const base = new Set(baseIds)
   const seen = new Set<string>()
   const result: string[] = []
@@ -36,26 +41,37 @@ export function reconcileOrder(baseIds: string[], stored: string[] | undefined |
     cursor += 1
   }
 
+  // The hero owns the page's only H1, so it leads whatever the stored order
+  // says. This also heals an outline saved before that rule existed.
+  if (hero && result.includes(hero)) {
+    return [hero, ...result.filter((id) => id !== hero)]
+  }
+
   return result
 }
 
 /**
- * Move one section to a new position. Position zero is always the H1, so
- * dragging a section to the top makes it the H1 and demotes the previous one.
+ * Move one section to a new position.
+ *
+ * The hero holds the page's only H1 and stays at position zero. It cannot be
+ * moved, and nothing can be dropped above it. Everything else is free.
  */
-export function moveSection(order: string[], id: string, toIndex: number): string[] {
+export function moveSection(order: string[], id: string, toIndex: number, hero?: string): string[] {
   const from = order.indexOf(id)
   if (from === -1) return [...order]
+  if (hero && id === hero) return [...order]
+
   const next = [...order]
   next.splice(from, 1)
-  const target = Math.max(0, Math.min(toIndex, next.length))
+  const floor = hero && next[0] === hero ? 1 : 0
+  const target = Math.max(floor, Math.min(toIndex, next.length))
   next.splice(target, 0, id)
   return next
 }
 
 /** Move a section one step up or down. This is the keyboard path. */
-export function nudgeSection(order: string[], id: string, direction: -1 | 1): string[] {
+export function nudgeSection(order: string[], id: string, direction: -1 | 1, hero?: string): string[] {
   const from = order.indexOf(id)
   if (from === -1) return [...order]
-  return moveSection(order, id, from + direction)
+  return moveSection(order, id, from + direction, hero)
 }

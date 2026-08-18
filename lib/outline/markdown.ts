@@ -13,13 +13,22 @@ function headingText(section: Section, headings: Headings): string {
 }
 
 function hash(level: number): string {
-  return level === 1 ? '# ' : '## '
+  if (level === 1) return '# '
+  return level === 2 ? '## ' : '### '
 }
 
 /** The outline as markdown, with heading levels intact. */
 export function toMarkdown({ sections, headings, headingsOnly = false }: MarkdownInput): string {
   if (headingsOnly) {
-    return sections.map((section) => hash(section.level) + headingText(section, headings)).join('\n\n') + '\n'
+    // The skim test reads the heading tree, so the items belong in it.
+    return (
+      sections
+        .flatMap((section) => [
+          hash(section.level) + headingText(section, headings),
+          ...(headings[section.id]?.items ?? []).map((item) => hash(3) + item.heading),
+        ])
+        .join('\n\n') + '\n'
+    )
   }
 
   return (
@@ -31,7 +40,13 @@ export function toMarkdown({ sections, headings, headingsOnly = false }: Markdow
           section.worries.length > 0
             ? `\nHandles ${section.worries.map((worry) => worry.label).join('. ')}.`
             : ''
-        return `${hash(section.level)}${headingText(section, headings)}\n\n${note}${handled}\n`
+        const body = written?.body ? `\n${written.body}\n` : ''
+        const support = written?.support ? `\nSupported by ${written.support}\n` : ''
+        const items = (written?.items ?? [])
+          .map((item) => `\n${hash(3)}${item.heading}\n${item.body ? `\n${item.body}\n` : ''}`)
+          .join('')
+        const cta = written?.cta ? `\n${written.cta}\n` : ''
+        return `${hash(section.level)}${headingText(section, headings)}\n\n${note}${handled}\n${body}${support}${items}${cta}`
       })
       .join('\n') + ''
   )

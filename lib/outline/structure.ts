@@ -2,6 +2,7 @@ import { DEFAULT_FRAMEWORK, MECHANIC_IDS, findMechanic, type Framework } from '.
 import { closeJob } from './goals'
 import { reconcileOrder } from './order'
 import { isLate, ownSectionId, placementOf, validSlotIds } from './placement'
+import { HERO_TYPE_ID, TYPE_BY_ROLE, DEFAULT_TYPE_ID } from './section-types'
 import { findSpine, spineSlotId } from './spines'
 import type { Assignments, Level, Section, SlotId, Worry } from './types'
 
@@ -29,7 +30,7 @@ export interface BuildInput {
  *  7. Close.
  *
  * The sequence is code. Every role and job in it comes from the framework.
- * Levels are not set here. They follow from the final position.
+ * Levels are not set here. The hero gets them in `buildStructure`.
  */
 export function baseSections({
   spine,
@@ -56,6 +57,7 @@ export function baseSections({
       role: slot.role,
       job: slot.job,
       worries: placed(id),
+      typeId: TYPE_BY_ROLE[slot.key] ?? DEFAULT_TYPE_ID,
     })
   }
 
@@ -68,6 +70,7 @@ export function baseSections({
       role: early.role,
       job: early.job,
       worries: [worry],
+      typeId: TYPE_BY_ROLE[MECHANIC_IDS.ownEarly] ?? DEFAULT_TYPE_ID,
     })
   }
 
@@ -79,6 +82,7 @@ export function baseSections({
     role: proof.role,
     job: proof.job,
     worries: placed(MECHANIC_IDS.proof),
+    typeId: TYPE_BY_ROLE[MECHANIC_IDS.proof] ?? DEFAULT_TYPE_ID,
   })
 
   if (resolved.id !== 'offer') {
@@ -90,6 +94,7 @@ export function baseSections({
       role: offer.role,
       job: offer.job,
       worries: placed(MECHANIC_IDS.offer),
+      typeId: TYPE_BY_ROLE[MECHANIC_IDS.offer] ?? DEFAULT_TYPE_ID,
     })
   }
 
@@ -102,6 +107,7 @@ export function baseSections({
       role: late.role,
       job: late.job,
       worries: [worry],
+      typeId: TYPE_BY_ROLE[MECHANIC_IDS.ownLate] ?? DEFAULT_TYPE_ID,
     })
   }
 
@@ -115,6 +121,7 @@ export function baseSections({
       role: faq.role,
       job: faq.job,
       worries: questions,
+      typeId: TYPE_BY_ROLE[MECHANIC_IDS.faq] ?? DEFAULT_TYPE_ID,
     })
   }
 
@@ -127,27 +134,42 @@ export function baseSections({
     // The page goal owns the close job. A Sections tab cannot override it.
     job: closeJob(goal, framework.goals),
     worries: placed(MECHANIC_IDS.close),
+    typeId: TYPE_BY_ROLE[MECHANIC_IDS.close] ?? DEFAULT_TYPE_ID,
   })
 
   return sections
 }
 
 /**
- * The assembled outline. Index zero is the H1, everything after is an H2.
+ * The assembled outline.
+ *
+ * Exactly one H1, and it belongs to the hero rather than to whatever sits at
+ * position zero. The hero is the first spine slot and is pinned there, so a
+ * reorder can never hand the H1 to the close. Every other section is a single
+ * H2. H3s are not sections at all; they come from a section type that repeats
+ * items, and `heading-rule.ts` holds the whole invariant.
  */
 export function buildStructure(input: BuildInput): Section[] {
   const base = baseSections(input)
   const byId = new Map(base.map((section) => [section.id, section]))
+  const hero = base[0]?.id ?? ''
   const order = reconcileOrder(
     base.map((section) => section.id),
     input.order,
+    hero,
   )
 
-  return order.map((id, index) => {
+  return order.map((id) => {
     const section = byId.get(id)!
-    const level: Level = index === 0 ? 1 : 2
-    return { ...section, level }
+    const level: Level = id === hero ? 1 : 2
+    const typeId = id === hero ? HERO_TYPE_ID : section.typeId
+    return { ...section, level, typeId }
   })
+}
+
+/** The id of the section that owns the page's H1, or empty when there is none. */
+export function heroId(sections: Section[]): string {
+  return sections.find((section) => section.level === 1)?.id ?? ''
 }
 
 export function sectionIds(sections: Section[]): string[] {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { toMarkdown } from '@/lib/outline/markdown'
 import { buildStructure } from '@/lib/outline/structure'
-import type { Headings } from '@/lib/outline/types'
+import { emptyHeading, type Headings } from '@/lib/outline/types'
 import { worry } from './helpers'
 
 const sections = buildStructure({
@@ -12,7 +12,7 @@ const sections = buildStructure({
 })
 
 const headings: Headings = Object.fromEntries(
-  sections.map((section) => [section.id, { heading: `Heading for ${section.role}`, note: `Note for ${section.role}` }]),
+  sections.map((section) => [section.id, { ...emptyHeading(), heading: `Heading for ${section.role}`, note: `Note for ${section.role}` }]),
 )
 
 describe('toMarkdown', () => {

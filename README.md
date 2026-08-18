@@ -1,6 +1,6 @@
 # Landing Page Outline Builder
 
-A writer picks the traffic, the products, the claims and the purchase worries. The app returns an ordered outline of one H1 and a series of H2s, with a note under each heading saying what that section has to do.
+A writer picks the traffic, the products, the claims and the purchase worries. The app returns an ordered outline of one H1 and a series of H2s, with a note under each heading saying what that section has to do. A section whose type repeats blocks also carries H3 items.
 
 The outline is the deliverable. There is no body copy generation, no publishing, and no accounts.
 
@@ -288,7 +288,7 @@ Two behaviours are worth knowing because they are judgement calls, not consequen
 
 **A worry pointing at a slot the current spine does not have is unplaced, not lost.** Override the spine after placing worries and those worries reappear in the tray instead of vanishing with a stale assignment.
 
-**A new section splices in after the section it follows in the base order, not at an absolute index.** Drag the close to the top, then give a worry its own section, and the new section lands after the spine slots where it belongs rather than in the middle of them.
+**A new section splices in after the section it follows in the base order, not at an absolute index.** Drag the close up the page, then give a worry its own section, and the new section lands after the spine slots where it belongs rather than in the middle of them.
 
 ## Heading generation
 
@@ -325,7 +325,26 @@ outlines
 
 The left column is a sequence of six numbered steps: repository status, what the page is about, products, claims, worries in play, traffic and goal. The right column is the section stack, which renders as soon as one product and one claim are picked and does not wait for the heading pass.
 
-Sections can be dragged with a pointer or moved with the arrow keys from the focused drag handle, which announces each move to a live region. Position zero is always the H1.
+Sections can be dragged with a pointer or moved with the arrow keys from the focused drag handle, which announces each move to a live region.
+
+### The heading rule
+
+One page, one H1, and it belongs to the hero rather than to whatever sits at position zero. Every other section is exactly one H2. H3s are not sections at all: they come from a section type that repeats items, which is what a feature grid or an FAQ accordion does.
+
+Two consequences worth knowing:
+
+- **The hero is pinned first and cannot be moved.** Nothing can be dropped above it, and the keyboard path stops at the second position. Before this rule, dragging the close to the top made the close the H1.
+- **A stored order that puts something else first is healed on read.** `reconcileOrder` lifts the hero back to the front, so an outline saved before the rule existed opens correctly rather than carrying a second H1.
+
+`lib/outline/heading-rule.ts` holds the whole invariant and `checkHeadingRule` reports what breaks it, including items on a section type that takes none, an item count outside the type's range, and an item heading that would render as a blank H3.
+
+### Section types
+
+Every section carries a `typeId` naming which Shopify section renders it, and each type declares its content slots and how many items it repeats. Items are the only source of an H3.
+
+The list is keyed to **metaobject definition handles** rather than to theme section files. A definition is a stable contract of a handle and typed field keys, which is what the app fills; a theme section file is a rendering detail that changes whenever a designer touches it. Keying to definitions is also what makes writing to Shopify later a mutation rather than a migration.
+
+`lib/outline/section-types.ts` holds the defaults, and `TYPE_BY_ROLE` picks a sensible type per argument beat. **The list is in code for now**, with a `Section types` sheet tab as the next step so the handles can match a real store without a deploy. The current handles (`lp_hero`, `lp_feature_grid` and so on) are placeholders to be replaced with real ones.
 
 ## Design notes
 

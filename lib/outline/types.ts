@@ -2,7 +2,8 @@
  * Shared domain types. No React, no fetch.
  */
 
-export type Level = 1 | 2
+/** H1, H2 or H3. One H1 per page, in the hero. H3 only ever comes from an item. */
+export type Level = 1 | 2 | 3
 
 export type SectionKind = 'spine' | 'objection' | 'mechanic'
 
@@ -57,11 +58,37 @@ export interface Section {
   role: string
   job: string
   worries: Worry[]
+  /** Which section type renders this. See `section-types.ts`. */
+  typeId: string
 }
 
+/** One repeated block inside a section. This is where an H3 comes from. */
+export interface HeadingItem {
+  heading: string
+  body: string
+}
+
+/**
+ * What has been written for one section. Kept separate from `Section` because a
+ * section is derived from the spine on every render while this is stored.
+ *
+ * `heading` is the section's single H2, or the page's only H1 in the hero.
+ * `items` are its H3s, and a section type that takes no items never has any.
+ */
 export interface Heading {
   heading: string
   note: string
+  /** The paragraph under the heading. Empty until the copy pass runs. */
+  body: string
+  /** The claim this section leans on, when its type takes one. */
+  support: string
+  /** Call to action, when its type takes one. */
+  cta: string
+  items: HeadingItem[]
+}
+
+export function emptyHeading(): Heading {
+  return { heading: '', note: '', body: '', support: '', cta: '', items: [] }
 }
 
 /** sectionId to heading. */

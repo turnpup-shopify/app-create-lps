@@ -124,7 +124,9 @@ describe('buildStructure', () => {
     expect(sections.slice(1).every((section) => section.level === 2)).toBe(true)
   })
 
-  it('honours a stored order and promotes whatever sits at position zero', () => {
+  it('honours a stored order but keeps the hero first and holding the H1', () => {
+    // The H1 belongs to the hero, not to whatever sits at position zero. A
+    // stored order that put the close on top would otherwise hand it the H1.
     const sections = buildStructure({
       spine: 'pas',
       goal: 'buy',
@@ -132,10 +134,31 @@ describe('buildStructure', () => {
       assignments: {},
       order: ['close', 'spine-problem'],
     })
-    expect(sections[0].id).toBe('close')
+    expect(sections[0].id).toBe('spine-problem')
     expect(sections[0].level).toBe(1)
-    expect(sections[1].id).toBe('spine-problem')
+    expect(sections[1].id).toBe('close')
     expect(sections[1].level).toBe(2)
+    // and the rest of the stored order is respected after the hero
+    expect(ids(sections).indexOf('close')).toBeLessThan(ids(sections).indexOf('proof'))
+  })
+
+  it('gives exactly one section the H1 and every other section an H2', () => {
+    const sections = buildStructure({
+      spine: 'pas',
+      goal: 'buy',
+      worries: [worry('w1', { tags: 'price' })],
+      assignments: { w1: 'own' },
+    })
+    expect(sections.filter((section) => section.level === 1)).toHaveLength(1)
+    expect(sections.slice(1).every((section) => section.level === 2)).toBe(true)
+    // no section is ever an H3. Those come from items inside a section.
+    expect(sections.some((section) => section.level === 3)).toBe(false)
+  })
+
+  it('marks the hero with the hero section type', () => {
+    const sections = buildStructure({ spine: 'pas', goal: 'buy', worries: [], assignments: {} })
+    expect(sections[0].typeId).toBe('hero')
+    expect(sections.slice(1).every((section) => section.typeId !== 'hero')).toBe(true)
   })
 
   it('keeps every section even when the stored order is partial', () => {
@@ -151,11 +174,21 @@ describe('buildStructure', () => {
     expect(ids(reordered).sort()).toEqual(ids(base).sort())
   })
 
-  it('survives a save and reload with the order intact', () => {
+  it('survives a save and reload with the order intact below the hero', () => {
     const input = { spine: 'pas' as const, goal: 'buy', worries: [], assignments: {} }
     const dragged = ['close', 'proof', 'spine-how', 'spine-solution', 'spine-agitate', 'spine-problem', 'offer']
     const reloaded = buildStructure({ ...input, order: dragged })
-    expect(ids(reloaded)).toEqual(dragged)
+    // The hero is lifted out and put back on top. Everything else keeps the
+    // order the writer chose, which also heals an outline saved before the rule.
+    expect(ids(reloaded)).toEqual([
+      'spine-problem',
+      'close',
+      'proof',
+      'spine-how',
+      'spine-solution',
+      'spine-agitate',
+      'offer',
+    ])
     expect(reloaded[0].level).toBe(1)
   })
 

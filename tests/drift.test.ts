@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { driftCount, missingHeadings, signatures } from '@/lib/outline/drift'
 import { buildStructure } from '@/lib/outline/structure'
-import type { Headings } from '@/lib/outline/types'
+import { emptyHeading, type Headings } from '@/lib/outline/types'
 import { worry } from './helpers'
 
 const build = (assignments: Record<string, string> = {}, order?: string[]) =>
   buildStructure({ spine: 'pas', goal: 'buy', worries: [worry('w1')], assignments, order })
 
 const wrote = (sections: { id: string }[]): Headings =>
-  Object.fromEntries(sections.map((section) => [section.id, { heading: 'a heading', note: 'a note' }]))
+  Object.fromEntries(sections.map((section) => [section.id, { ...emptyHeading(), heading: 'a heading', note: 'a note' }]))
 
 describe('driftCount', () => {
   it('reports nothing before a pass exists', () => {

@@ -38,6 +38,19 @@ export interface FrameworkResult {
 const rowsOf = (text: string | null | undefined): Row[] =>
   text ? readRows(text).filter((row) => !isBlank(row)) : []
 
+/**
+ * Names the columns the tab actually has.
+ *
+ * Without this a wrong header name and an empty cell produce the same sentence,
+ * and the reader has no way to tell which they are looking at. Naming what was
+ * found turns the guess into a comparison.
+ */
+function found(row: Row | undefined): string {
+  const names = Object.keys(row ?? {}).filter((name) => name.length > 0)
+  if (names.length === 0) return ' The tab appears to have no header row.'
+  return ` The columns found were ${names.join(', ')}.`
+}
+
 /* ------------------------------------------------------------------ */
 /* Per tab                                                             */
 /* ------------------------------------------------------------------ */
@@ -52,7 +65,7 @@ function parseAwareness(rows: Row[], problems: TabProblem[]): AwarenessStage[] |
     if (!id || !label || !lead || !spine) {
       problems.push({
         tab: TAB_NAMES.awareness,
-        message: `Row ${index + 2} needs an id, a label, a lead and a spine.`,
+        message: `Row ${index + 2} needs an id, a label, a lead and a spine.${found(row)}`,
       })
       return
     }
@@ -71,7 +84,7 @@ function parseSpines(spineRows: Row[], slotRows: Row[], problems: TabProblem[]):
     if (!spine || !key || !role) {
       problems.push({
         tab: TAB_NAMES.slots,
-        message: `Row ${index + 2} needs a spine, a key and a role.`,
+        message: `Row ${index + 2} needs a spine, a key and a role.${found(row)}`,
       })
       return
     }
@@ -93,7 +106,7 @@ function parseSpines(spineRows: Row[], slotRows: Row[], problems: TabProblem[]):
     if (!id || !name) {
       problems.push({
         tab: TAB_NAMES.spines,
-        message: `Row ${index + 2} needs an id and a name.`,
+        message: `Row ${index + 2} needs an id and a name.${found(row)}`,
       })
       return
     }
@@ -118,7 +131,7 @@ function parseGoals(rows: Row[], problems: TabProblem[]): Goal[] | null {
     if (!id || !label || !close) {
       problems.push({
         tab: TAB_NAMES.goals,
-        message: `Row ${index + 2} needs an id, a label and a close job.`,
+        message: `Row ${index + 2} needs an id, a label and a close job.${found(row)}`,
       })
       return
     }
@@ -135,7 +148,7 @@ function parseSections(rows: Row[], problems: TabProblem[]): MechanicSection[] |
     if (!id || !role) {
       problems.push({
         tab: TAB_NAMES.sections,
-        message: `Row ${index + 2} needs an id and a role.`,
+        message: `Row ${index + 2} needs an id and a role.${found(row)}`,
       })
       return
     }

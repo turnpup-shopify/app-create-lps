@@ -229,3 +229,28 @@ describe('when the sheet is wrong', () => {
     expect(crossCheck(framework)).toEqual([])
   })
 })
+
+describe('when a tab has the wrong column names', () => {
+  it('names the columns it actually found, so the reader can compare', () => {
+    // The failure that sent a reader looking for empty cells when the real
+    // problem was a header called stage rather than label.
+    const { problems } = assembleFramework({
+      awareness: 'id,stage,opening,spine\nskimmer,Skimmer,Lead with proof,pas\n',
+    })
+    expect(problems[0].tab).toBe('Awareness')
+    expect(problems[0].message).toContain('Row 2')
+    expect(problems[0].message).toContain('The columns found were')
+    expect(problems[0].message).toContain('stage')
+    expect(problems[0].message).toContain('opening')
+  })
+
+  it('says so when a tab has no header row at all', () => {
+    const { problems } = assembleFramework({ goals: '\n\n' })
+    expect(problems.length === 0 || problems[0].message.includes('no header row')).toBe(true)
+  })
+
+  it('still names the columns when only one required cell is blank', () => {
+    const { problems } = assembleFramework({ goals: 'id,label,close job\nbuy,,Ask for the sale.\n' })
+    expect(problems[0].message).toContain('The columns found were id, label, close job')
+  })
+})

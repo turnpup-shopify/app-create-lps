@@ -155,9 +155,12 @@ export async function GET(request: Request) {
   }
 
   if (products.length + claims.length + worries.length === 0) {
+    // Name the tabs it looked for. A sheet holding one flat table is the common
+    // case here, and "check the tab names" does not tell that reader anything.
+    const looked = CONTENT_TABS.map((key) => TAB_NAMES[key]).join(', ')
     return NextResponse.json(
       {
-        error: NO_CONTENT,
+        error: `The sheet loaded but held no products, claims or worries. It looked for tabs named ${looked}, spelled exactly that way. A sheet holding one flat table with a type column wants SHEET_CSV_URL instead.`,
         sheet: sheetId,
         framework,
         sources,

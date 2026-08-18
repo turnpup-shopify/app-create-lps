@@ -410,11 +410,28 @@ select.field {
   color: var(--ink);
 }
 
-/* Headings only collapses every section to the H1 and the H2s. */
+/* Headings only collapses every section to the H1, the H2s and the H3s.
+   Body copy, the support line and the call to action all go, because the point
+   of the skim test is whether the headings alone argue. Item headings stay,
+   since they are headings. */
 .skim .slab-role,
 .skim .slab-note,
 .skim .slab-worries,
+.skim .slab-eyebrow,
+.skim .slab-body,
+.skim .slab-support,
+.skim .slab-cta,
 .skim .handle {
+  display: none;
+}
+
+/* An item keeps its heading and loses its paragraph. */
+.skim .slab-items {
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.skim .slab-items > div > p:not(.slab-item-heading) {
   display: none;
 }
 

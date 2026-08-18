@@ -12,6 +12,7 @@ export const HeadingsSchema = z
     z.object({
       heading: z.string(),
       note: z.string(),
+      eyebrow: z.string().default(''),
       body: z.string().default(''),
       support: z.string().default(''),
       cta: z.string().default(''),

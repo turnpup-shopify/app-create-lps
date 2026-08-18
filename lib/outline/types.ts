@@ -80,6 +80,8 @@ export interface Heading {
   note: string
   /** The paragraph under the heading. Empty until the copy pass runs. */
   body: string
+  /** The small line above the heading, when its type takes one. */
+  eyebrow: string
   /** The claim this section leans on, when its type takes one. */
   support: string
   /** Call to action, when its type takes one. */
@@ -88,7 +90,7 @@ export interface Heading {
 }
 
 export function emptyHeading(): Heading {
-  return { heading: '', note: '', body: '', support: '', cta: '', items: [] }
+  return { heading: '', note: '', eyebrow: '', body: '', support: '', cta: '', items: [] }
 }
 
 /** sectionId to heading. */

@@ -55,9 +55,20 @@ describe('house style', () => {
     }
   })
 
-  it('states the punctuation rule in the heading prompt', () => {
-    const prompt = fs.readFileSync(path.join(process.cwd(), 'lib', 'prompts', 'headings.md'), 'utf8')
+  it('states the punctuation rule in the copy prompt', () => {
+    const prompt = fs.readFileSync(path.join(process.cwd(), 'lib', 'prompts', 'copy.md'), 'utf8')
     expect(prompt).toContain('Never use hyphens, dashes, semicolons or colons')
-    expect(prompt).toContain('{{BRIEF}}')
+  })
+
+  it('says the punctuation rule stops at the body, so nobody reinstates it by accident', () => {
+    // The rule is deliberately not applied to prose, where a colon is sometimes
+    // the right mark. `reconcileCopy` matches this, and both should move together.
+    const prompt = fs.readFileSync(path.join(process.cwd(), 'lib', 'prompts', 'copy.md'), 'utf8')
+    expect(prompt).toContain('does not extend to the body')
+  })
+
+  it('tells the model that items are siblings rather than new sections', () => {
+    const prompt = fs.readFileSync(path.join(process.cwd(), 'lib', 'prompts', 'copy.md'), 'utf8')
+    expect(prompt).toContain('not a second layer of sections')
   })
 })

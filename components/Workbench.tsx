@@ -3,7 +3,12 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PillRow } from './PillRow'
-import { RepositoryStep, type RepositorySource, type RepositoryStatus } from './RepositoryStep'
+import {
+  RepositoryStep,
+  type RepositoryLayout,
+  type RepositorySource,
+  type RepositoryStatus,
+} from './RepositoryStep'
 import { SectionSlab } from './SectionSlab'
 import {
   activeSpine,
@@ -27,7 +32,8 @@ import {
   validSlotIds,
 } from '@/lib/outline/placement'
 import { buildStructure, heroId, sectionIds } from '@/lib/outline/structure'
-import { emptyHeading, emptyRepository, type Headings, type Repository } from '@/lib/outline/types'
+import { reconcileCopy, type WrittenCopy } from '@/lib/outline/copy'
+import { emptyRepository, type Headings, type Repository } from '@/lib/outline/types'
 import type { TabProblem } from '@/lib/repository/framework-tabs'
 import { claimsInScope, parseRepositoryCsv, worriesInScope } from '@/lib/repository/parse'
 
@@ -65,9 +71,11 @@ export function Workbench({
   const [source, setSource] = useState<RepositorySource>(null)
   const [repoMessage, setRepoMessage] = useState<string | null>(null)
   const [sheet, setSheet] = useState<string | null>(null)
+  const [layout, setLayout] = useState<RepositoryLayout>(null)
 
   const [working, setWorking] = useState(false)
   const [headingError, setHeadingError] = useState<string | null>(null)
+  const [corrections, setCorrections] = useState<string[]>([])
   const [skim, setSkim] = useState(false)
   const [copied, setCopied] = useState(false)
   const [trayFor, setTrayFor] = useState<string | null>(null)
@@ -106,6 +114,7 @@ export function Workbench({
       setRepository({ products: body.products, claims: body.claims, worries: body.worries })
       setSource('sheet')
       setSheet(body.sheet ?? null)
+      setLayout(body.layout === 'tabs' || body.layout === 'single' ? body.layout : null)
       setStatus('ready')
     } catch {
       setStatus('failed')
@@ -261,12 +270,13 @@ export function Workbench({
   }
 
   /* ---------------------------------------------------------------- */
-  /* The heading pass                                                  */
+  /* The copy pass                                                     */
   /* ---------------------------------------------------------------- */
 
   async function writeHeadings() {
     setWorking(true)
     setHeadingError(null)
+    setCorrections([])
     setSkim(false)
 
     const payload = toHeadingBrief({ ...brief, order: sectionIds(sections) }, repository, sections, framework)
@@ -278,18 +288,14 @@ export function Workbench({
         body: JSON.stringify({ brief: payload }),
       })
       const body = await response.json()
-      const written: { id: string; heading: string; note: string }[] = Array.isArray(body.headings)
-        ? body.headings
-        : []
+      const written: WrittenCopy[] = Array.isArray(body.sections) ? body.sections : []
 
       if (written.length > 0) {
-        const next: Headings = {}
-        // The copy fields stay empty until the copy pass writes them.
-        for (const entry of written) {
-          next[entry.id] = { ...emptyHeading(), heading: entry.heading, note: entry.note }
-        }
+        // Held to what each section type can render before it reaches the page.
+        const { headings: next, corrections } = reconcileCopy(sections, written)
         setHeadings(next)
         setPass(signatures(sections))
+        setCorrections(corrections)
         if (body.error) setHeadingError(body.error)
       } else {
         setHeadingError(body.error ?? HEADINGS_FAILED)
@@ -376,6 +382,7 @@ export function Workbench({
             source={source}
             message={repoMessage}
             sheet={sheet}
+            layout={layout}
             counts={{
               products: repository.products.length,
               claims: repository.claims.length,
@@ -649,10 +656,10 @@ export function Workbench({
               <div className="mt-5 flex flex-wrap items-center gap-2.5">
                 <button className="button" type="button" onClick={() => void writeHeadings()} disabled={working}>
                   {working
-                    ? 'Writing the headings'
+                    ? 'Writing the copy'
                     : unwritten === sections.length
-                      ? 'Write the headings'
-                      : 'Rewrite the headings'}
+                      ? 'Write the copy'
+                      : 'Rewrite the copy'}
                 </button>
                 {pass && drifted > 0 && (
                   <span className="hint">
@@ -660,6 +667,21 @@ export function Workbench({
                   </span>
                 )}
               </div>
+
+              {/* What had to be corrected on the way in. Silence would hide a
+                  section quietly losing its items. */}
+              {corrections.length > 0 && (
+                <div className="note-panel mt-3">
+                  <p className="label mb-1.5">What was corrected</p>
+                  <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                    {corrections.map((line, index) => (
+                      <li key={index} className="text-[13px]">
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <p className="hint mt-3.5">
                 {skim

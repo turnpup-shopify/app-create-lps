@@ -2,7 +2,7 @@
 
 A writer picks the traffic, the products, the claims and the purchase worries. The app returns an ordered outline of one H1 and a series of H2s, with a note under each heading saying what that section has to do. A section whose type repeats blocks also carries H3 items.
 
-The outline is the deliverable. There is no body copy generation, no publishing, and no accounts.
+The outline is the deliverable and the copy pass fills it in. There is no publishing and there are no accounts.
 
 ## Stack
 
@@ -290,15 +290,21 @@ Two behaviours are worth knowing because they are judgement calls, not consequen
 
 **A new section splices in after the section it follows in the base order, not at an absolute index.** Drag the close up the page, then give a worry its own section, and the new section lands after the spine slots where it belongs rather than in the middle of them.
 
-## Heading generation
+## The copy pass
 
-`POST /api/headings` takes the brief plus the assembled structure and returns `[{ id, heading, note }]`.
+`POST /api/headings` takes the brief plus the assembled structure and returns one object per section: `{ id, heading, note, eyebrow, body, support, cta, items }`.
 
-Server side, Anthropic SDK, model `claude-sonnet-4-6`, `max_tokens` 1500. The prompt lives in `lib/prompts/headings.md` and is read with `fs.readFile` at request time, so a writer can edit it without touching component code. `{{BRIEF}}` is where the brief JSON is injected.
+Server side, Anthropic SDK, model `claude-opus-5`, `max_tokens` 16000. The prompt lives in `lib/prompts/copy.md` and is read with `fs.readFile` at request time, so a writer can edit it without touching component code.
 
-The reply is validated with zod and retried once on a parse failure. On a second failure the route returns 200 with `{ headings: [], error }` and the UI keeps showing the structure with role placeholders. A failed heading pass never wipes the outline.
+The rules go in a cached system block and the brief goes in the message, so rewriting a page reuses the prefix rather than paying for it again. One call writes the whole page rather than one call per section, because the headings have to argue in sequence and a per section call cannot see its siblings.
 
-The punctuation rule (no hyphens, dashes, semicolons or colons in any heading or note) is stated in the prompt **and** enforced on the way out by `scrub`. The prompt is the instruction; the scrub is the guarantee.
+The reply shape is constrained by structured outputs (`output_config.format`) rather than parsed and retried, so every field arrives present and typed. On a refusal or an unusable reply the route returns 200 with `{ sections: [], error }` and the UI keeps the structure and any copy already on screen. A failed pass never wipes the outline.
+
+`reconcileCopy` then holds the reply to what each section type can actually render: items are dropped from a type that renders none, trimmed to the type's maximum, and an item with no heading is removed rather than rendered as a blank H3. Anything corrected is listed in the interface instead of being swallowed.
+
+The punctuation rule (no hyphens, dashes, semicolons or colons) is stated in the prompt **and** enforced on the way out by `scrub`. The prompt is the instruction; the scrub is the guarantee.
+
+It divides on one line: **the body is prose and keeps its normal punctuation**, because a colon there is sometimes the right mark. Everything else on a section is a label that gets scanned rather than read, so the heading, the note, the eyebrow, the call to action, the support line and every item heading are all held to the rule.
 
 ## Saved outlines
 

@@ -85,10 +85,33 @@ export function SectionSlab({
 
       <div className="min-w-0 flex-1">
         <span className="step-number">{level}</span>
+        {heading?.eyebrow && <p className="slab-eyebrow label mb-1">{heading.eyebrow}</p>}
         <p className="slab-heading" data-level={section.level} data-blank={!heading}>
           {heading ? heading.heading : `${section.role} heading not written yet`}
         </p>
         <p className="slab-note mt-1.5 text-[13px] text-muted">{heading ? heading.note : section.job}</p>
+
+        {/* The written copy. Absent until the copy pass runs. */}
+        {heading?.body && <p className="slab-body mt-2 text-[13.5px]">{heading.body}</p>}
+
+        {heading?.items && heading.items.length > 0 && (
+          <div className="slab-items mt-2.5 flex flex-col gap-2">
+            {heading.items.map((item, index) => (
+              <div key={index} className="border-l border-rule pl-2.5">
+                <p className="slab-item-heading text-[13.5px] font-semibold" data-level="3">
+                  {item.heading}
+                </p>
+                {item.body && <p className="mt-0.5 text-[13px] text-muted">{item.body}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {heading?.support && (
+          <p className="slab-support mt-2 text-[12.5px] text-muted">Leans on {heading.support}</p>
+        )}
+
+        {heading?.cta && <p className="slab-cta mt-2 text-[12.5px] font-semibold">{heading.cta}</p>}
 
         {own ? (
           <div className="slab-worries mt-2 flex flex-wrap items-center gap-1.5">

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { DEFAULT_AWARENESS, findStage, isAwarenessId, type AwarenessId } from './awareness'
 import { DEFAULT_FRAMEWORK, type Framework } from './framework'
 import { DEFAULT_GOAL, findGoal, isGoalId, type GoalId } from './goals'
+import { findSectionType } from './section-types'
 import { findSpine, isSpineId, type SpineId } from './spines'
 import type { Assignments, Claim, Product, Repository, Section, Worry } from './types'
 
@@ -147,6 +148,12 @@ export interface HeadingBrief {
     job: string
     ownSection: boolean
     worries: { worry: string; answer: string }[]
+    /** Which Shopify section renders this, so the copy fits the container. */
+    sectionType: string
+    /** Which slots to write. Anything not listed is discarded on the way back. */
+    write: string[]
+    /** How many H3 items to write. Zero means this section renders none. */
+    items: { min: number; max: number }
   }[]
 }
 
@@ -170,13 +177,19 @@ export function toHeadingBrief(
     pageGoal: findGoal(brief.goal, framework.goals).label,
     leadClaim: claims[0]?.label ?? null,
     claims: claims.map((claim) => ({ claim: claim.label, support: claim.detail })),
-    slots: sections.map((section) => ({
-      id: section.id,
-      level: section.level === 1 ? 'H1' : 'H2',
-      role: section.role,
-      job: section.job,
-      ownSection: section.kind === 'objection',
-      worries: section.worries.map((worry) => ({ worry: worry.label, answer: worry.detail })),
-    })),
+    slots: sections.map((section) => {
+      const type = findSectionType(section.typeId)
+      return {
+        id: section.id,
+        level: section.level === 1 ? ('H1' as const) : ('H2' as const),
+        role: section.role,
+        job: section.job,
+        ownSection: section.kind === 'objection',
+        worries: section.worries.map((worry) => ({ worry: worry.label, answer: worry.detail })),
+        sectionType: type.label,
+        write: type.slots,
+        items: { min: type.minItems, max: type.maxItems },
+      }
+    }),
   }
 }

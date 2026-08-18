@@ -6,6 +6,8 @@ import type { TabProblem } from '@/lib/repository/framework-tabs'
 
 export type RepositoryStatus = 'loading' | 'ready' | 'failed'
 export type RepositorySource = 'sheet' | 'paste' | null
+/** Which sheet layout answered. `single` cannot carry framework tabs at all. */
+export type RepositoryLayout = 'tabs' | 'single' | null
 
 const SLICE_LABELS: [keyof FrameworkSources, string][] = [
   ['awareness', 'stages'],
@@ -20,6 +22,7 @@ export function RepositoryStep({
   source,
   message,
   sheet,
+  layout,
   counts,
   sources,
   problems,
@@ -30,6 +33,7 @@ export function RepositoryStep({
   source: RepositorySource
   message: string | null
   sheet: string | null
+  layout: RepositoryLayout
   counts: { products: number; claims: number; worries: number }
   /** Which slice of the framework came from the sheet, once known. */
   sources: FrameworkSources | null
@@ -86,7 +90,11 @@ export function RepositoryStep({
               : source === null
                 ? // No sheet was read at all, so blaming one for holding nothing would be wrong.
                   'Using the built in framework, which is everything you need to build an outline.'
-                : 'Using the built in framework. The sheet supplied no stages, spines or section jobs.'
+                : layout === 'single'
+                  ? // A one tab sheet holds content only. It could not supply a
+                    // framework even if the writer wanted it to.
+                    'Using the built in framework. This sheet holds content only. Set SHEET_ID to a nine tab sheet to edit the framework.'
+                  : 'Using the built in framework. The sheet supplied no stages, spines or section jobs.'
             : fromBuiltIn.length === 0
               ? 'Framework from the sheet.'
               : `Framework from the sheet for ${fromSheet.map(([, label]) => label).join(', ')}. Built in for ${fromBuiltIn

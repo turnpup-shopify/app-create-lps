@@ -91,9 +91,10 @@ export function RepositoryStep({
                 ? // No sheet was read at all, so blaming one for holding nothing would be wrong.
                   'Using the built in framework, which is everything you need to build an outline.'
                 : layout === 'single'
-                  ? // A one tab sheet holds content only. It could not supply a
-                    // framework even if the writer wanted it to.
-                    'Using the built in framework. This sheet holds content only. Set SHEET_ID to a nine tab sheet to edit the framework.'
+                  ? // This layout holds content only. Naming the mechanism by
+                    // which it could hold more would mean inventing a term the
+                    // reader does not have, so say what is true instead.
+                    'Using the built in framework. Your sheet holds the products, the claims and the worries. The stages, the spines and the section jobs come from the app.'
                   : 'Using the built in framework. The sheet supplied no stages, spines or section jobs.'
             : fromBuiltIn.length === 0
               ? 'Framework from the sheet.'

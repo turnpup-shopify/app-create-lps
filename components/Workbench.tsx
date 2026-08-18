@@ -588,10 +588,13 @@ export function Workbench({
           {headingError && <div className="note-panel mt-3">{headingError}</div>}
 
           {!ready && (
-            <p className="max-w-[40ch] py-6 text-[13.5px] text-muted">
-              Pick a product and at least one claim. The section stack builds itself from the spine, then you place
-              worries into the sections that answer them.
-            </p>
+            <div className="note-panel mt-3">
+              <p className="label mb-1.5">Nothing to show yet</p>
+              <p className="text-[13.5px]">
+                Pick a product in step 03 and a claim in step 04. The outline appears here straight away, before any
+                copy is written, and the button to write the copy appears with it.
+              </p>
+            </div>
           )}
 
           {ready && (

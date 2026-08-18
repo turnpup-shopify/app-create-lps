@@ -47,6 +47,17 @@ Each slot carries `items` with a `min` and a `max`.
 - An item body is one or two sentences.
 - Items are siblings under the section's own H2. They are not a second layer of sections, so do not use them to smuggle in new argument beats.
 
+## Reference pages
+
+The brief may carry a `references` list. Each one is a real landing page, reduced to its heading tree and the copy under each heading.
+
+They are there to show you how pages in this market actually argue, and how long and how concrete the copy runs. Read them for shape and register.
+
+- Never copy a phrase from a reference. They are somebody else's page.
+- Never adopt a claim from a reference. The claims you may make are the ones in `claims` and nowhere else.
+- Do not follow their structure. The structure of this page is already decided by `slots`.
+- If the references disagree with the rules above, the rules win.
+
 ## Order
 
 Return one object per slot, in the same order as `slots`, using the `id` copied from the slot exactly. No extras and no omissions.

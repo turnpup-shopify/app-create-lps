@@ -16,11 +16,14 @@ export const TAB_NAMES = {
   goals: 'Goals',
   sections: 'Sections',
   settings: 'Settings',
+  references: 'References',
 } as const
 
 export type TabKey = keyof typeof TAB_NAMES
 
 export const CONTENT_TABS: TabKey[] = ['products', 'claims', 'worries']
+/** Neither content nor framework. Pages to learn from, and always optional. */
+export const REFERENCE_TABS: TabKey[] = ['references']
 export const FRAMEWORK_TABS: TabKey[] = ['awareness', 'spines', 'slots', 'goals', 'sections', 'settings']
 
 /** `tabs` reads a nine tab sheet. `single` reads the original flat table. */

@@ -16,6 +16,7 @@
     "@anthropic-ai/sdk": "^0.117.1",
     "drizzle-orm": "^0.45.2",
     "next": "^15.5.23",
+    "node-html-parser": "^9.0.1",
     "papaparse": "^5.6.0",
     "postgres": "^3.4.9",
     "react": "^19.0.0",

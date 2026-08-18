@@ -33,6 +33,7 @@ import {
 } from '@/lib/outline/placement'
 import { buildStructure, heroId, sectionIds } from '@/lib/outline/structure'
 import { reconcileCopy, type WrittenCopy } from '@/lib/outline/copy'
+import type { BriefReference } from '@/lib/outline/brief'
 import { emptyRepository, type Headings, type Repository } from '@/lib/outline/types'
 import type { TabProblem } from '@/lib/repository/framework-tabs'
 import { claimsInScope, parseRepositoryCsv, worriesInScope } from '@/lib/repository/parse'
@@ -76,6 +77,8 @@ export function Workbench({
   const [working, setWorking] = useState(false)
   const [headingError, setHeadingError] = useState<string | null>(null)
   const [corrections, setCorrections] = useState<string[]>([])
+  const [references, setReferences] = useState<BriefReference[]>([])
+  const [referenceProblems, setReferenceProblems] = useState<{ url: string; message: string }[]>([])
   const [skim, setSkim] = useState(false)
   const [copied, setCopied] = useState(false)
   const [trayFor, setTrayFor] = useState<string | null>(null)
@@ -125,6 +128,37 @@ export function Workbench({
   useEffect(() => {
     void load(false)
   }, [load])
+
+  // Reference pages are read once and shown, so the writer knows what is
+  // informing the copy and which pages could not be read.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const response = await fetch('/api/references')
+        const body = await response.json()
+        if (cancelled) return
+        setReferences(
+          Array.isArray(body.pages)
+            ? body.pages.map((page: { label: string; headings: { level: number; heading: string; body: string }[] }) => ({
+                page: page.label,
+                outline: page.headings.map((entry) => ({
+                  level: `H${entry.level}`,
+                  heading: entry.heading,
+                  copy: entry.body,
+                })),
+              }))
+            : [],
+        )
+        setReferenceProblems(Array.isArray(body.problems) ? body.problems : [])
+      } catch {
+        // Reference pages are an aid, so failing to read them changes nothing.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const readPaste = useCallback((text: string): string | null => {
     const parsed = parseRepositoryCsv(text)
@@ -280,6 +314,7 @@ export function Workbench({
     setSkim(false)
 
     const payload = toHeadingBrief({ ...brief, order: sectionIds(sections) }, repository, sections, framework)
+    if (references.length > 0) payload.references = references
 
     try {
       const response = await fetch('/api/headings', {
@@ -670,6 +705,40 @@ export function Workbench({
                   </span>
                 )}
               </div>
+
+              {/* Which pages informed the copy. Worth naming, because copy that
+                  borrowed a register from somewhere should say where. */}
+              {(references.length > 0 || referenceProblems.length > 0) && (
+                <div className="note-panel mt-3">
+                  <p className="label mb-1.5">Pages read for reference</p>
+                  {references.length > 0 && (
+                    <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                      {references.map((reference) => (
+                        <li key={reference.page} className="text-[13px]">
+                          {reference.page}{' '}
+                          <span className="text-muted">
+                            {reference.outline.length === 1
+                              ? '1 heading'
+                              : `${reference.outline.length} headings`}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {referenceProblems.length > 0 && (
+                    <ul className="m-0 mt-1.5 flex list-none flex-col gap-1 p-0">
+                      {referenceProblems.map((problem) => (
+                        <li key={problem.url} className="text-[13px] text-muted">
+                          <span className="font-mono text-[11.5px] break-all">{problem.url}</span> {problem.message}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="hint mt-2">
+                    These shape how the copy reads. Every claim still comes from the sheet.
+                  </p>
+                </div>
+              )}
 
               {/* What had to be corrected on the way in. Silence would hide a
                   section quietly losing its items. */}

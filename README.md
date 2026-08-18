@@ -15,10 +15,11 @@ The outline is the deliverable and the copy pass fills it in. There is no publis
 ## Environment
 
 ```
-SHEET_ID           # Google Sheet holding the nine tabs. Read only. Preferred.
+SHEET_ID           # Google Sheet holding the tabs. Read only. Preferred.
 SHEET_CSV_URL      # One published tab, the original layout. Used only when SHEET_ID is unset.
 ANTHROPIC_API_KEY  # server side only
 DATABASE_URL       # Postgres. POSTGRES_URL is read too, see below.
+REFERENCE_URLS     # optional. Reference pages, comma separated, for the single tab layout.
 ```
 
 Copy `.env.example` to `.env.local` and fill it in.
@@ -305,6 +306,33 @@ The reply shape is constrained by structured outputs (`output_config.format`) ra
 The punctuation rule (no hyphens, dashes, semicolons or colons) is stated in the prompt **and** enforced on the way out by `scrub`. The prompt is the instruction; the scrub is the guarantee.
 
 It divides on one line: **the body is prose and keeps its normal punctuation**, because a colon there is sometimes the right mark. Everything else on a section is a label that gets scanned rather than read, so the heading, the note, the eyebrow, the call to action, the support line and every item heading are all held to the rule.
+
+## Reference pages
+
+The copy pass can read landing pages you nominate and use them as worked examples of how pages in your market argue. They shape how the copy reads. **They are never a source of claims** — those come from the sheet and nowhere else, and the prompt says so explicitly.
+
+### Where the list lives
+
+A `References` tab in a nine tab sheet:
+
+| column | required | meaning |
+| ------ | -------- | ------- |
+| `url` | yes | Must start with http or https. `address` and `link` are accepted names. |
+| `label` | no | What to call it in the interface. Falls back to the page title. |
+| `note` | no | Why it is here. For your benefit, not the model's. |
+| `use` | no | `no`, `false` or `off` parks a row without deleting it. |
+
+For the single tab layout, which cannot carry extra tabs, set `REFERENCE_URLS` to a comma separated list instead. The tab wins when it has rows.
+
+At most four pages are read, because more crowds the prompt and slows the pass.
+
+### What gets read, and what does not
+
+A plain `fetch`, then the heading tree and the copy under each heading. Not the raw body HTML: a real landing page body is hundreds of kilobytes of nested divs and tracking pixels, and none of it teaches anything about how the page argues. Scripts, styles, navigation and footers are stripped, so a theme's "Shop all" never arrives as a heading.
+
+**A page that builds itself in the browser comes back empty, and is reported rather than silently skipped.** Seeing the real content would need a headless browser, and Chromium does not fit in a Vercel function. Most server rendered pages, Shopify storefronts included, read fine. Anything that does not says so in the interface, along with pages that 404, time out, or turn out not to be web pages.
+
+`GET /api/references` does the reading, cached for an hour, with `?fresh=1` to bypass. Requests identify themselves in the user agent rather than pretending to be a person.
 
 ## Saved outlines
 

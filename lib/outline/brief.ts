@@ -130,7 +130,13 @@ export function selectedWorries(brief: Brief, repository: Repository): Worry[] {
   return brief.worries.map((id) => byId.get(id)).filter((worry): worry is Worry => Boolean(worry))
 }
 
-/** The JSON block the heading prompt receives. */
+/** A page the writer nominated, reduced to its heading tree. */
+export interface BriefReference {
+  page: string
+  outline: { level: string; heading: string; copy: string }[]
+}
+
+/** The JSON block the copy prompt receives. */
 export interface HeadingBrief {
   pageIdea: string
   audience: string
@@ -141,6 +147,8 @@ export interface HeadingBrief {
   pageGoal: string
   leadClaim: string | null
   claims: { claim: string; support: string }[]
+  /** Pages to learn shape and register from. Never a source of claims. */
+  references?: BriefReference[]
   slots: {
     id: string
     level: 'H1' | 'H2'

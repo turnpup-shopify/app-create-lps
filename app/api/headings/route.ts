@@ -94,6 +94,10 @@ export async function POST(request: Request) {
   const rules = await readPrompt()
   const client = new Anthropic()
 
+  // Reference pages arrive with the brief. They are read on the client so the
+  // writer can see which ones were used and which failed, and passed through
+  // here rather than fetched again.
+
   // The rules are the same on every request and the brief is not, so the rules
   // go in a cached system block and the brief goes in the message. Rewriting a
   // page then reuses the prefix instead of paying for it again.

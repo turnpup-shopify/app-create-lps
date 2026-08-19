@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outline Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E7EAEE; --surface:#FFF; --ink:#15171C; --muted:#767C86; --rule:#D9DDE3; --wire:#C8CDD4;
+  --accent:#3D3A9E; --accent-bg:#EDECF8;
+  --amber:#8A5A12; --amber-bg:#FAF1E0;
+  --rust:#9B2F26; --rust-bg:#FBEBE9;
+  --green:#1E6B4E; --green-bg:#E7F2ED;
+  --ui:"Archivo",-apple-system,BlinkMacSystemFont,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--ui);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1400px;margin:0 auto;padding:24px 22px 70px}
+header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+h1{font-size:18px;font-weight:700;letter-spacing:-.01em;margin:0}
+.sub{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.src{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:2px}
+.src.live{background:var(--green-bg);color:var(--green)}
+.src.demo{background:var(--amber-bg);color:var(--amber)}
+
+.cols{display:grid;grid-template-columns:340px 316px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1120px){.cols{grid-template-columns:320px minmax(0,1fr)}.pane-detail{grid-column:1/-1}}
+@media (max-width:760px){.cols{grid-template-columns:1fr}}
+
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:16px}
+.card + .card{margin-top:12px}
+.cap{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);display:flex;justify-content:space-between;align-items:baseline;margin:0 0 11px}
+[hidden]{display:none !important}
+
+/* collapsible cards */
+details.card{padding:0}
+details.card > summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+details.card > summary::-webkit-details-marker{display:none}
+details.card > summary:hover{color:var(--ink)}
+details.card > summary .chev{transition:transform .15s ease;font-size:14px;line-height:1}
+details.card[open] > summary .chev{transform:rotate(90deg)}
+details.card[open] > summary{border-bottom:1px solid var(--rule)}
+details.card > .body{padding:14px 16px 16px}
+.sum{font-family:var(--ui);font-size:12.5px;text-transform:none;letter-spacing:0;color:var(--ink);font-weight:500;margin-left:8px}
+details.card[open] > summary .sum{display:none}
+.more{font-family:var(--mono);font-size:10px;color:var(--muted);background:none;border:1px dashed var(--rule);border-radius:2px;padding:6px 8px;cursor:pointer;width:100%;margin-top:10px}
+.more:hover{color:var(--ink);border-color:var(--muted)}
+
+/* collapsible warnings */
+details.warns{margin-bottom:6px}
+details.warns > summary{list-style:none;cursor:pointer;font-size:12.5px;padding:8px 10px;border-radius:3px;background:var(--amber-bg);color:var(--amber);display:flex;gap:7px;align-items:center}
+details.warns > summary::-webkit-details-marker{display:none}
+details.warns > summary .chev{margin-left:auto;transition:transform .15s ease;font-size:14px;line-height:1}
+details.warns[open] > summary .chev{transform:rotate(90deg)}
+details.warns[open] > summary{border-radius:3px 3px 0 0}
+details.warns .flag{border-radius:0;margin-bottom:0;border-top:1px solid rgba(138,90,18,.16)}
+details.warns .flag:last-child{border-radius:0 0 3px 3px}
+
+/* collapsible copy slots */
+details.slots > summary{list-style:none;cursor:pointer;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:16px;padding:4px 0}
+details.slots > summary::-webkit-details-marker{display:none}
+details.slots > summary:hover{color:var(--ink)}
+label.f{display:block;font-size:11.5px;color:var(--muted);margin:0 0 4px}
+select,input[type=text]{width:100%;font-family:var(--ui);font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:7px 9px}
+select:focus-visible,input:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sp{height:11px}
+
+/* pickers */
+.pick{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:start;padding:9px 0;border-top:1px solid var(--rule);cursor:pointer}
+.pick:first-of-type{border-top:none}
+.pick input{margin:2px 0 0;accent-color:var(--accent)}
+.pick .l1{font-size:13px;font-weight:500;line-height:1.35}
+.pick .l2{font-size:12px;color:var(--muted);line-height:1.35;margin-top:1px}
+.pick.off{opacity:.3;cursor:not-allowed}
+.pick.off .why{display:block}
+.why{display:none;font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px}
+.right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.bars{display:flex;gap:2px;margin-top:4px}
+.bars i{width:4px;height:9px;border-radius:1px;background:var(--rule);display:block}
+.bars i.on{background:var(--accent)}
+.pin{font-family:var(--mono);font-size:9px;letter-spacing:.05em;border:1px solid var(--rule);background:none;color:var(--muted);border-radius:2px;padding:1px 4px;cursor:pointer}
+.pin.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.scope{font-family:var(--mono);font-size:9px;text-transform:uppercase;color:var(--muted)}
+
+/* flags */
+.flag{display:flex;gap:7px;font-size:12.5px;padding:8px 10px;border-radius:3px;margin-bottom:6px;line-height:1.4}
+.flag.err{background:var(--rust-bg);color:var(--rust)}
+.flag.warn{background:var(--amber-bg);color:var(--amber)}
+.flag.ok{background:var(--green-bg);color:var(--green)}
+.flag .ic{font-family:var(--mono);font-weight:500}
+.flag b{font-weight:600}
+
+/* page preview */
+.page{background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:10px}
+.thesis{font-size:11.5px;color:var(--muted);text-align:center;padding:7px 8px 9px;border-bottom:1px dashed var(--rule);margin-bottom:8px;line-height:1.35}
+.sect{position:relative;border:1px solid transparent;border-radius:3px;padding:8px;margin-bottom:5px;cursor:pointer;background:#FAFBFC}
+.sect:hover{background:#F2F4F7}
+.sect.sel{border-color:var(--accent);background:var(--accent-bg)}
+.sect .idx{position:absolute;left:-24px;top:9px;font-family:var(--mono);font-size:9.5px;color:var(--muted)}
+.page{padding-left:34px}
+.rep{font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;color:var(--accent);text-transform:uppercase;margin:8px 0 3px}
+.bar{background:var(--wire);border-radius:1px;height:6px;margin-bottom:4px}
+.bar.t{height:9px}
+.bar.s{height:4px;opacity:.6}
+.box{background:var(--wire);border-radius:2px;opacity:.55}
+.btn{background:var(--accent);opacity:.5;height:9px;width:38px;border-radius:2px;margin-top:5px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.rowsp{display:grid;grid-template-columns:74px 1fr;gap:8px;align-items:center}
+.num{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--wire);line-height:1}
+.tbl{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:3px}
+.tbl span{height:6px;background:var(--wire);border-radius:1px;opacity:.5}
+.tbl span.h{opacity:.85}
+.miss{position:absolute;right:7px;top:7px;font-family:var(--mono);font-size:8.5px;color:var(--amber);background:var(--amber-bg);padding:1px 4px;border-radius:2px}
+
+/* detail */
+.kv{display:grid;grid-template-columns:88px 1fr;gap:6px 12px;font-size:13px;margin-bottom:14px}
+.kv dt{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-top:3px}
+.kv dd{margin:0}
+.chip{font-family:var(--mono);font-size:10.5px;border:1px solid var(--rule);background:none;color:var(--muted);border-radius:2px;padding:3px 7px;cursor:pointer;margin:0 4px 4px 0}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip:disabled{cursor:default;opacity:.6}
+.slot{font-family:var(--mono);font-size:10.5px;color:var(--accent);background:var(--accent-bg);border-radius:2px;padding:2px 6px;margin:0 4px 4px 0;display:inline-block}
+.empty{font-size:13px;color:var(--muted);padding:22px 4px}
+.foot{display:flex;gap:12px;align-items:center;margin-top:14px;flex-wrap:wrap}
+button.go{font-family:var(--ui);font-size:14px;font-weight:500;color:#fff;background:var(--accent);border:none;border-radius:3px;padding:9px 16px;cursor:pointer}
+button.go:disabled{background:#B9BCC4;cursor:not-allowed}
+.note{font-size:12px;color:var(--muted)}
+.hint{font-size:11.5px;color:var(--muted);margin:8px 0 0;line-height:1.4}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Outline Builder</h1>
+  <span class="sub" id="prodname"></span>
+  <span class="src demo" id="source">demo data</span>
+</header>
+
+<div class="cols">
+
+  <!-- 1. inputs -->
+  <div>
+    <details class="card" id="setup" open>
+      <summary><span>Setup<span class="sum" id="setupsum"></span></span><span class="chev">&#8250;</span></summary>
+      <div class="body">
+        <div class="two">
+          <div><label class="f" for="prod">Product</label><select id="prod"></select></div>
+          <div><label class="f" for="aw">Awareness</label><select id="aw"></select></div>
+        </div>
+        <div class="sp"></div>
+        <label class="f" for="arc">Arc</label><select id="arc"></select>
+        <div class="sp"></div>
+        <label class="f" for="idea">Controlling idea</label>
+        <input type="text" id="idea" value="A multivitamin you can actually verify">
+        <p class="hint" id="arcnote"></p>
+      </div>
+    </details>
+
+    <div class="card">
+      <p class="cap"><span>Claims</span><span id="ccount"></span></p>
+      <div id="claims"></div>
+      <button type="button" class="more" id="showall" hidden></button>
+    </div>
+
+    <details class="card" id="objwrap">
+      <summary><span>Objections<span class="sum" id="objsum"></span></span><span class="chev">&#8250;</span></summary>
+      <div class="body"><div id="objs"></div></div>
+    </details>
+  </div>
+
+  <!-- 2. page -->
+  <div>
+    <div class="cap" style="padding:0 2px"><span>Page</span><span id="meta"></span></div>
+    <div class="page" id="page"></div>
+  </div>
+
+  <!-- 3. detail -->
+  <div class="pane-detail">
+    <div id="flags"></div>
+    <div class="card">
+      <p class="cap"><span id="dtitle">Section</span><span id="dpos"></span></p>
+      <div id="detail"><p class="empty">Click a section in the page to inspect it.</p></div>
+    </div>
+    <div class="foot">
+      <button class="go" id="gen">Generate copy</button>
+      <span class="note" id="gnote"></span>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+/* ============ CONFIG ============ */
+var ENDPOINT = "";                                  /* paste Apps Script /exec URL */
+
+/* PLACEHOLDER. Section names below (lp_hero, lp_split, lp_grid, lp_stack,
+   lp_numbered, lp_compare) do NOT exist in the theme. They are stand ins until
+   06-section-audit.md produces the real vocabulary. Replace them here and in the
+   eligible_sections column of arc_steps at the same time. */
+var NEEDS_MEDIA = { lp_hero:1, lp_split:1, lp_numbered:1 };
+var STAGE_LABELS = { unaware:"Cold and unaware", problem:"Problem aware", solution:"Solution aware",
+                     product:"Product aware", most:"Most aware" };
+var STOP = " a an the and or of to for in on with is are it that this you your we our not no do does ".split(" ");
+
+/* ============ DEMO DATA (shape the Apps Script returns) ============ */
+var DEMO={
+products:[{product_id:"meridian_daily",name:"Meridian Daily",category:"multivitamin",price:48,
+ one_liner:"Third party tested daily multivitamin"}],
+claims:[
+{claim_id:"cl_01",product_id:"meridian_daily",scope:"reason",strength:5,asset_id:"as_01",awareness:["problem","solution","product"],kills_objection:["ob_01","ob_03"],feature:"Every batch tested by an outside lab",benefit:"You know what is actually in the bottle",emotion:"Stop wondering if you wasted your money",proof:"NSF certified, results published per lot"},
+{claim_id:"cl_02",product_id:"meridian_daily",scope:"reason",strength:5,asset_id:"",awareness:["solution","product"],kills_objection:["ob_02","ob_06"],feature:"Methylated B12 and folate",benefit:"Absorbs without the conversion step",emotion:"Works even if your body does not convert well",proof:"Roughly 40 percent carry an MTHFR variant"},
+{claim_id:"cl_03",product_id:"meridian_daily",scope:"reason",strength:4,asset_id:"",awareness:["solution","product"],kills_objection:["ob_06"],feature:"Iron and calcium split across two doses",benefit:"Neither one blocks the other",emotion:"The dose you take is the dose you get",proof:""},
+{claim_id:"cl_04",product_id:"meridian_daily",scope:"reason",strength:4,asset_id:"as_02",awareness:["problem","solution"],kills_objection:["ob_04"],feature:"Two capsules instead of eight",benefit:"You actually finish the bottle",emotion:"No more shelf full of good intentions",proof:""},
+{claim_id:"cl_05",product_id:"meridian_daily",scope:"reason",strength:3,asset_id:"as_04",awareness:["solution","product"],kills_objection:["ob_03"],feature:"No synthetic dyes, no titanium dioxide",benefit:"Nothing in there doing nothing",emotion:"",proof:""},
+{claim_id:"cl_06",product_id:"meridian_daily",scope:"spec",strength:2,asset_id:"",awareness:["product","most"],kills_objection:[],feature:"Vegan capsule shell",benefit:"",emotion:"",proof:""},
+{claim_id:"cl_07",product_id:"meridian_daily",scope:"spec",strength:2,asset_id:"",awareness:["product","most"],kills_objection:[],feature:"Sixty day supply per bottle",benefit:"",emotion:"",proof:""},
+{claim_id:"cl_08",product_id:"meridian_daily",scope:"detail",strength:1,asset_id:"",awareness:["most"],kills_objection:["ob_07"],feature:"Free shipping over forty dollars",benefit:"",emotion:"",proof:""}],
+objections:[
+{objection_id:"ob_01",product_id:"meridian_daily",severity:5,category:"efficacy",objection:"Multivitamins do not do anything, the studies say so",rebuttal:"Most of those studies tested cheap synthetic forms at low doses"},
+{objection_id:"ob_03",product_id:"meridian_daily",severity:5,category:"trust",objection:"Supplements are barely regulated so who knows what is in it",rebuttal:"Every lot is tested by an outside lab and published"},
+{objection_id:"ob_02",product_id:"meridian_daily",severity:4,category:"efficacy",objection:"I eat well enough, I do not need one",rebuttal:"Diet quality is not the same as absorption"},
+{objection_id:"ob_05",product_id:"meridian_daily",severity:4,category:"price",objection:"Costs more than the grocery store brand",rebuttal:"Price per absorbed dose is the honest comparison"},
+{objection_id:"ob_04",product_id:"meridian_daily",severity:3,category:"effort",objection:"I never finish a bottle",rebuttal:"Two capsules a day, reorder timed to when you run out"},
+{objection_id:"ob_06",product_id:"meridian_daily",severity:3,category:"efficacy",objection:"Everything in one pill so it probably fights itself",rebuttal:"Iron and calcium are split across two doses"},
+{objection_id:"ob_07",product_id:"meridian_daily",severity:3,category:"risk",objection:"I do not want to be locked into a subscription",rebuttal:"Skip, pause, or cancel from a link in every email"}],
+assets:[
+{asset_id:"as_01",orientation:"vertical",crops:["4x5","9x16"],proves_claim:"cl_01"},
+{asset_id:"as_02",orientation:"horizontal",crops:["16x9"],proves_claim:"cl_04"},
+{asset_id:"as_04",orientation:"square",crops:["1x1"],proves_claim:"cl_05"}],
+arcs:[
+{arc_id:"problem_first",arc_name:"Problem first",awareness:["problem"],order_strategy:"strength_desc",cap_behavior:"drop_lowest",max_sections:12,min_sections:0,scope_filter:"",note:"Strongest claim opens the page. Sections drop from the bottom over twelve."},
+{arc_id:"listicle",arc_name:"Listicle",awareness:["problem","solution"],order_strategy:"bookend",cap_behavior:"constrain_selection",max_sections:8,min_sections:3,scope_filter:"reason",note:"Reason claims only. Strongest first, second strongest last. The headline promises a count so nothing drops."},
+{arc_id:"comparison",arc_name:"Comparison",awareness:["solution"],order_strategy:"strength_desc",cap_behavior:"drop_lowest",max_sections:10,min_sections:0,scope_filter:"",note:"Built around one table. Claims become rows of difference first."},
+{arc_id:"benefit_first",arc_name:"Benefit first",awareness:["product"],order_strategy:"strength_desc",cap_behavior:"drop_lowest",max_sections:12,min_sections:0,scope_filter:"",note:"Opens on the outcome. They know the category so skip the problem setup."},
+{arc_id:"objection_first",arc_name:"Objection first",awareness:["most"],order_strategy:"strength_desc",cap_behavior:"drop_lowest",max_sections:8,min_sections:0,scope_filter:"",note:"Retargeting. Lead with the offer and clear the blockers."}],
+arc_steps:[
+{arc_id:"problem_first",position:1,role:"hook_problem",role_label:"Name the problem",binds:"top_claim",repeat_on:"none",droppable:false,eligible_sections:["lp_hero"],copy_target:["eyebrow","headline","subhead","cta"],role_intent:"Say the pain in their words before naming the product",tone_note:"Plain and specific. No superlatives"},
+{arc_id:"problem_first",position:2,role:"agitate",role_label:"Agitate",binds:"none",repeat_on:"none",droppable:true,eligible_sections:["lp_stack"],copy_target:["headline","body"],role_intent:"Make the cost of ignoring it concrete and near term",tone_note:"Two sentences. No fear mongering"},
+{arc_id:"problem_first",position:3,role:"mechanism",role_label:"Show the mechanism",binds:"claim_peek",repeat_on:"none",droppable:false,eligible_sections:["lp_split","lp_stack"],copy_target:["headline","body"],role_intent:"Explain why the fix works, once, in plain terms",tone_note:"Technical but readable"},
+{arc_id:"problem_first",position:4,role:"prove_benefit",role_label:"Prove the benefit",binds:"claim",repeat_on:"claim",max_count:5,droppable:true,eligible_sections:["lp_split","lp_grid","lp_stack"],copy_target:["headline","body"],role_intent:"One reason to believe, driven all the way home",tone_note:"Concrete. Lead with the outcome"},
+{arc_id:"problem_first",position:5,role:"handle_objection",role_label:"Handle the objection",binds:"objection",repeat_on:"objection",max_count:3,droppable:true,eligible_sections:["lp_stack","lp_compare"],copy_target:["headline","body"],role_intent:"Name the doubt in their words, then answer it plainly",tone_note:"Never defensive"},
+{arc_id:"problem_first",position:6,role:"social_proof",role_label:"Social proof",binds:"testimonial",repeat_on:"none",droppable:true,eligible_sections:["lp_stack"],copy_target:["headline","quote"],role_intent:"Let a customer make the argument instead of you",tone_note:"Verbatim only"},
+{arc_id:"problem_first",position:7,role:"close",role_label:"Close",binds:"none",repeat_on:"none",droppable:false,eligible_sections:["lp_stack"],copy_target:["headline","body","cta"],role_intent:"Restate the single idea and ask for the order",tone_note:"Short. One ask"},
+
+{arc_id:"listicle",position:1,role:"hook_count",role_label:"Hook with the count",binds:"count",repeat_on:"none",droppable:false,eligible_sections:["lp_hero"],copy_target:["eyebrow","headline","subhead","cta"],role_intent:"Headline must contain the number of reasons",tone_note:"The number is the hook"},
+{arc_id:"listicle",position:2,role:"frame_stakes",role_label:"Frame the stakes",binds:"none",repeat_on:"none",droppable:true,eligible_sections:["lp_stack"],copy_target:["headline","body"],role_intent:"Say why this matters now, in two sentences",tone_note:"Set up the list, do not spoil it"},
+{arc_id:"listicle",position:3,role:"list_item",role_label:"List item",binds:"claim",repeat_on:"claim",max_count:8,droppable:false,eligible_sections:["lp_numbered"],copy_target:["headline","body"],role_intent:"One numbered reason, self contained, no forward references",tone_note:"Each item readable on its own"},
+{arc_id:"listicle",position:4,role:"handle_objection",role_label:"Handle the objection",binds:"objection",repeat_on:"objection",max_count:2,droppable:true,eligible_sections:["lp_stack","lp_compare"],copy_target:["headline","body"],role_intent:"Name the doubt in their words, then answer it plainly",tone_note:"Never defensive"},
+{arc_id:"listicle",position:5,role:"social_proof",role_label:"Social proof",binds:"testimonial",repeat_on:"none",droppable:true,eligible_sections:["lp_stack"],copy_target:["headline","quote"],role_intent:"Let a customer make the argument instead of you",tone_note:"Verbatim only"},
+{arc_id:"listicle",position:6,role:"close",role_label:"Close",binds:"none",repeat_on:"none",droppable:false,eligible_sections:["lp_stack"],copy_target:["headline","body","cta"],role_intent:"Restate the single idea and ask for the order",tone_note:"Short. One ask"},
+
+{arc_id:"comparison",position:1,role:"hook_alt",role_label:"Name the alternative",binds:"top_claim",repeat_on:"none",droppable:false,eligible_sections:["lp_hero"],copy_target:["eyebrow","headline","subhead","cta"],role_intent:"State what they are probably about to buy instead",tone_note:"Fair to the alternative"},
+{arc_id:"comparison",position:2,role:"the_table",role_label:"Put them side by side",binds:"none",repeat_on:"none",droppable:false,eligible_sections:["lp_compare"],copy_target:["headline","rows"],role_intent:"One table. No hedging, no asterisks",tone_note:"Factual. No adjectives"},
+{arc_id:"comparison",position:3,role:"prove_benefit",role_label:"Prove the difference",binds:"claim",repeat_on:"claim",max_count:4,droppable:true,eligible_sections:["lp_split","lp_grid"],copy_target:["headline","body"],role_intent:"Take the biggest gap in the table and prove it",tone_note:"Concrete"},
+{arc_id:"comparison",position:4,role:"handle_objection",role_label:"Handle the objection",binds:"objection",repeat_on:"objection",max_count:2,droppable:true,eligible_sections:["lp_stack","lp_compare"],copy_target:["headline","body"],role_intent:"Name the doubt in their words, then answer it plainly",tone_note:"Never defensive"},
+{arc_id:"comparison",position:5,role:"social_proof",role_label:"Social proof",binds:"testimonial",repeat_on:"none",droppable:true,eligible_sections:["lp_stack"],copy_target:["headline","quote"],role_intent:"Someone who switched, in their own words",tone_note:"Verbatim only"},
+{arc_id:"comparison",position:6,role:"close",role_label:"Close",binds:"none",repeat_on:"none",droppable:false,eligible_sections:["lp_stack"],copy_target:["headline","body","cta"],role_intent:"Restate the single idea and ask for the order",tone_note:"Short. One ask"},
+
+{arc_id:"benefit_first",position:1,role:"hook_benefit",role_label:"Lead with the outcome",binds:"top_claim",repeat_on:"none",droppable:false,eligible_sections:["lp_hero"],copy_target:["eyebrow","headline","subhead","cta"],role_intent:"Open on what they get, not what it is",tone_note:"Outcome first"},
+{arc_id:"benefit_first",position:2,role:"prove_benefit",role_label:"Prove the benefit",binds:"claim",repeat_on:"claim",max_count:5,droppable:true,eligible_sections:["lp_split","lp_grid","lp_stack"],copy_target:["headline","body"],role_intent:"One reason to believe, driven all the way home",tone_note:"Concrete"},
+{arc_id:"benefit_first",position:3,role:"mechanism",role_label:"Show the mechanism",binds:"claim_peek",repeat_on:"none",droppable:false,eligible_sections:["lp_split","lp_stack"],copy_target:["headline","body"],role_intent:"Explain why the fix works, once, in plain terms",tone_note:"Technical but readable"},
+{arc_id:"benefit_first",position:4,role:"handle_objection",role_label:"Handle the objection",binds:"objection",repeat_on:"objection",max_count:3,droppable:true,eligible_sections:["lp_stack","lp_compare"],copy_target:["headline","body"],role_intent:"Name the doubt in their words, then answer it plainly",tone_note:"Never defensive"},
+{arc_id:"benefit_first",position:5,role:"social_proof",role_label:"Social proof",binds:"testimonial",repeat_on:"none",droppable:true,eligible_sections:["lp_stack"],copy_target:["headline","quote"],role_intent:"Let a customer make the argument instead of you",tone_note:"Verbatim only"},
+{arc_id:"benefit_first",position:6,role:"close",role_label:"Close",binds:"none",repeat_on:"none",droppable:false,eligible_sections:["lp_stack"],copy_target:["headline","body","cta"],role_intent:"Restate the single idea and ask for the order",tone_note:"Short. One ask"},
+
+{arc_id:"objection_first",position:1,role:"hook_offer",role_label:"Lead with the offer",binds:"top_claim",repeat_on:"none",droppable:false,eligible_sections:["lp_hero"],copy_target:["eyebrow","headline","subhead","cta"],role_intent:"State the offer and the risk reversal up front",tone_note:"No warm up"},
+{arc_id:"objection_first",position:2,role:"handle_objection",role_label:"Handle the objection",binds:"objection",repeat_on:"objection",max_count:3,droppable:false,eligible_sections:["lp_stack","lp_compare"],copy_target:["headline","body"],role_intent:"Name the doubt in their words, then answer it plainly",tone_note:"Never defensive"},
+{arc_id:"objection_first",position:3,role:"prove_benefit",role_label:"Prove the benefit",binds:"claim",repeat_on:"claim",max_count:3,droppable:true,eligible_sections:["lp_split","lp_grid"],copy_target:["headline","body"],role_intent:"One reason to believe, kept short",tone_note:"Brief"},
+{arc_id:"objection_first",position:4,role:"social_proof",role_label:"Social proof",binds:"testimonial",repeat_on:"none",droppable:true,eligible_sections:["lp_stack"],copy_target:["headline","quote"],role_intent:"Let a customer make the argument instead of you",tone_note:"Verbatim only"},
+{arc_id:"objection_first",position:5,role:"close",role_label:"Close",binds:"none",repeat_on:"none",droppable:false,eligible_sections:["lp_stack"],copy_target:["headline","body","cta"],role_intent:"Restate the single idea and ask for the order",tone_note:"Short. One ask"}],
+testimonials:[],voice:[]};
+
+/* ============ APP ============ */
+(function(){
+var $=function(i){return document.getElementById(i)};
+var DATA=null,ARCS={},ASSETS={},ROWS=[],SEL=null,OVERRIDE={},PIN=null;
+var SHOWALL=false,WOPEN=false,TOUCHED=false;
+
+function fl(f){return '<div class="flag '+f[0]+'"><span class="ic">'+
+  (f[0]==='err'?'!':f[0]==='warn'?'?':'\u2713')+'</span><span><b>'+f[1]+'.</b> '+f[2]+'</span></div>'}
+
+function boot(d){
+  DATA=d;
+  (d.assets||[]).forEach(function(a){ASSETS[a.asset_id]=a});
+  (d.arcs||[]).forEach(function(a){ARCS[a.arc_id]=a;
+    a.steps=(d.arc_steps||[]).filter(function(s){return s.arc_id===a.arc_id})
+      .sort(function(x,y){return x.position-y.position})});
+  $('prod').innerHTML=(d.products||[]).map(function(p){
+    return '<option value="'+p.product_id+'">'+p.name+'</option>'}).join('');
+  Object.keys(STAGE_LABELS).forEach(function(k){
+    $('aw').insertAdjacentHTML('beforeend','<option value="'+k+'">'+STAGE_LABELS[k]+'</option>')});
+  paintProduct();loadArcs();build();
+}
+if(ENDPOINT){fetch(ENDPOINT).then(function(r){return r.json()})
+  .then(function(d){$('source').className='src live';$('source').textContent='live sheet';boot(d)})
+  .catch(function(){$('source').textContent='sheet unreachable';boot(DEMO)})}
+else boot(DEMO);
+
+function esc(s){return String(s||'').replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function myClaims(){return (DATA.claims||[]).filter(function(c){return c.product_id===$('prod').value})}
+function myObjs(){return (DATA.objections||[]).filter(function(o){return o.product_id===$('prod').value})}
+function bars(n,max){var h='';for(var i=1;i<=max;i++)h+='<i class="'+(i<=n?'on':'')+'"></i>';
+  return '<span class="bars">'+h+'</span>'}
+
+function paintProduct(){
+  var p=(DATA.products||[]).filter(function(x){return x.product_id===$('prod').value})[0];
+  $('prodname').textContent=p?p.one_liner:'';
+  $('claims').innerHTML=myClaims().slice().sort(function(a,b){return b.strength-a.strength})
+   .map(function(c,i){return '<label class="pick" data-id="'+c.claim_id+'">'+
+    '<input type="checkbox" value="'+c.claim_id+'"'+(i<4?' checked':'')+'>'+
+    '<span><span class="l1">'+esc(c.feature)+'</span>'+
+      (c.benefit?'<span class="l2">'+esc(c.benefit)+'</span>':'')+
+      '<span class="why"></span></span>'+
+    '<span class="right"><button type="button" class="pin" data-pin="'+c.claim_id+'" title="Pin to hero">hero</button>'+
+      bars(c.strength,5)+'</span></label>'}).join('');
+  $('objs').innerHTML=myObjs().slice().sort(function(a,b){return b.severity-a.severity})
+   .map(function(o,i){return '<label class="pick" data-id="'+o.objection_id+'">'+
+    '<input type="checkbox" value="'+o.objection_id+'"'+(i<2?' checked':'')+'>'+
+    '<span><span class="l1">'+esc(o.objection)+'</span>'+
+      '<span class="l2 scope">'+esc(o.category)+'</span></span>'+
+    '<span class="right">'+bars(o.severity,5)+'</span></label>'}).join('');
+  document.querySelectorAll('#claims input,#objs input').forEach(function(c){
+    c.addEventListener('change',function(){
+      SEL=null;
+      if(!TOUCHED){TOUCHED=true;$('setup').open=false}
+      build()})});
+  document.querySelectorAll('[data-pin]').forEach(function(b){
+    b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();
+      PIN=(PIN===b.dataset.pin)?null:b.dataset.pin;build()})});
+}
+
+function loadArcs(){
+  var st=$('aw').value;
+  var keep=Object.keys(ARCS).filter(function(k){return (ARCS[k].awareness||[]).indexOf(st)>-1});
+  $('arc').innerHTML=keep.length?keep.map(function(k){
+    return '<option value="'+k+'">'+ARCS[k].arc_name+'</option>'}).join('')
+    :'<option value="">No arc for this stage</option>';
+  OVERRIDE={};SEL=null;
+}
+
+/* ---- wireframe shapes ---- */
+function wire(sec){
+  if(sec==='lp_hero')return '<div class="bar t" style="width:82%"></div>'+
+    '<div class="bar t" style="width:58%"></div><div class="bar s" style="width:70%"></div>'+
+    '<div class="bar s" style="width:64%"></div><div class="btn"></div>';
+  if(sec==='lp_split')return '<div class="rowsp"><div class="box" style="height:46px"></div>'+
+    '<div><div class="bar" style="width:80%"></div><div class="bar s" style="width:100%"></div>'+
+    '<div class="bar s" style="width:88%"></div><div class="bar s" style="width:52%"></div></div></div>';
+  if(sec==='lp_grid')return '<div class="bar" style="width:46%;margin:0 auto 7px"></div>'+
+    '<div class="row3">'+[0,0,0].map(function(){return '<div><div class="box" style="height:20px;margin-bottom:4px"></div>'+
+    '<div class="bar s"></div><div class="bar s" style="width:70%"></div></div>'}).join('')+'</div>';
+  if(sec==='lp_numbered')return '<div class="rowsp" style="grid-template-columns:26px 1fr">'+
+    '<div class="num">01</div><div><div class="bar" style="width:74%"></div>'+
+    '<div class="bar s" style="width:100%"></div><div class="bar s" style="width:66%"></div></div></div>';
+  if(sec==='lp_compare')return '<div class="bar" style="width:44%;margin:0 auto 7px"></div>'+
+    '<div class="tbl">'+[1,0,0,0].map(function(h){return [0,0,0].map(function(){
+      return '<span class="'+(h?'h':'')+'"></span>'}).join('')}).join('')+'</div>';
+  return '<div class="bar" style="width:52%;margin:0 auto 6px"></div>'+
+    '<div class="bar s" style="width:88%;margin:0 auto 4px"></div>'+
+    '<div class="bar s" style="width:74%;margin:0 auto"></div>';
+}
+
+function tokens(s){return String(s||'').toLowerCase().replace(/[^a-z0-9 ]/g,'')
+  .split(/\s+/).filter(function(w){return w.length>2&&STOP.indexOf(' '+w+' ')<0})}
+
+/* ---- main ---- */
+function build(){
+  var A=ARCS[$('arc').value];
+  if(!A){ROWS=[];$('page').innerHTML='';$('meta').textContent='';$('gen').disabled=true;
+    $('flags').innerHTML='<div class="flag err"><span class="ic">!</span><span><b>No arc.</b> '+
+      'Nothing in the arcs tab serves this stage.</span></div>';renderDetail();return}
+  var stage=$('aw').value;
+  $('arcnote').textContent=A.note||'';
+
+  /* eligibility */
+  var nHid=0;
+  document.querySelectorAll('#claims .pick').forEach(function(el){
+    var c=myClaims().filter(function(x){return x.claim_id===el.dataset.id})[0];if(!c)return;
+    var why='';
+    if(A.scope_filter&&c.scope!==A.scope_filter)why='needs scope '+A.scope_filter;
+    else if((c.awareness||[]).indexOf(stage)<0)why='not valid at this stage';
+    el.classList.toggle('off',!!why);
+    el.querySelector('.why').textContent=why;
+    var b=el.querySelector('input');b.disabled=!!why;if(why)b.checked=false;
+    if(why)nHid++;
+    el.hidden=!!why&&!SHOWALL;
+    var pin=el.querySelector('.pin');
+    pin.classList.toggle('on',PIN===c.claim_id);
+    pin.style.display=(A.order_strategy==='strength_desc'&&!why)?'':'none';
+  });
+  var sa=$('showall');
+  sa.hidden=!nHid;
+  sa.textContent=SHOWALL?'hide '+nHid+' ineligible'
+    :nHid+' claim'+(nHid>1?'s':'')+' not eligible here';
+
+  var cl=[],ob=[];
+  document.querySelectorAll('#claims input:checked').forEach(function(b){
+    myClaims().forEach(function(c){if(c.claim_id===b.value)cl.push(c)})});
+  document.querySelectorAll('#objs input:checked').forEach(function(b){
+    myObjs().forEach(function(o){if(o.objection_id===b.value)ob.push(o)})});
+  cl.sort(function(a,b){return b.strength-a.strength||a.claim_id.localeCompare(b.claim_id)});
+  ob.sort(function(a,b){return b.severity-a.severity||a.objection_id.localeCompare(b.objection_id)});
+
+  $('ccount').textContent=A.scope_filter?cl.length+' of '+A.min_sections+' to '+A.max_sections:'strength';
+  $('setupsum').textContent=STAGE_LABELS[stage]+' \u00b7 '+A.arc_name;
+  $('objsum').textContent=ob.length?ob.length+' selected':'none selected';
+
+  /* flags */
+  var F=[],hard=false;
+  if(!cl.length){F.push(['err','No claims','Check at least one claim.']);hard=true}
+  if(A.scope_filter&&cl.length&&cl.length<A.min_sections){
+    F.push(['err','Too few reasons','Needs '+A.min_sections+'. You have '+cl.length+'.']);hard=true}
+  if(A.cap_behavior==='constrain_selection'&&cl.length>A.max_sections){
+    F.push(['err','Over the count','Cap is '+A.max_sections+'. Uncheck '+(cl.length-A.max_sections)+
+      '. The headline promises a number.']);hard=true}
+  ob.forEach(function(o){
+    if(!cl.some(function(c){return (c.kills_objection||[]).indexOf(o.objection_id)>-1})){
+      var fix=myClaims().filter(function(c){return (c.kills_objection||[]).indexOf(o.objection_id)>-1});
+      F.push(['warn','Doubt left open','"'+esc(o.objection)+'" is raised and never answered.'+
+        (fix.length?' "'+esc(fix[0].feature)+'" would answer it.':' Nothing in the sheet answers it.')])}});
+
+  /* order */
+  var pool=cl.slice(),hero=null;
+  if(A.order_strategy==='strength_desc'&&pool.length){
+    if(PIN){var pi=pool.map(function(c){return c.claim_id}).indexOf(PIN);
+      if(pi>-1)hero=pool.splice(pi,1)[0]}
+    if(!hero)hero=pool.shift();
+  } else if(A.order_strategy==='bookend'&&pool.length>2){pool.push(pool.splice(1,1)[0])}
+
+  /* expand */
+  ROWS=[];var rot={},last='',gid=0;
+  A.steps.forEach(function(s){
+    var n=1;
+    if(s.repeat_on==='claim')n=pool.length;
+    if(s.repeat_on==='objection')n=ob.length;
+    if(n===0)return;
+    if(s.max_count&&n>s.max_count)n=s.max_count;
+    var g=n>1?++gid:0;
+    for(var k=0;k<n;k++){
+      var es=s.eligible_sections||['lp_stack'];
+      rot[s.role]=rot[s.role]||0;
+      var sec=es[rot[s.role]%es.length];
+      if(sec===last&&es.length>1){rot[s.role]++;sec=es[rot[s.role]%es.length]}
+      rot[s.role]++;last=sec;
+      var key=s.role+'#'+k;
+      if(OVERRIDE[key]&&es.indexOf(OVERRIDE[key])>-1)sec=OVERRIDE[key];
+      var bind=null,kind='';
+      if(s.binds==='top_claim'&&hero){bind=hero;kind='claim'}
+      else if(s.binds==='count'){kind='count'}
+      else if(s.binds==='claim_peek'&&pool[0]){bind=pool[0];kind='claim'}
+      else if(s.repeat_on==='claim'&&pool[k]){bind=pool[k];kind='claim'}
+      else if(s.repeat_on==='objection'&&ob[k]){bind=ob[k];kind='objection'}
+      ROWS.push({step:s,key:key,sec:sec,bind:bind,kind:kind,eligible:es,
+        count:pool.length,groupFirst:(k===0&&n>1),gsize:n,
+        gwhy:n+' '+(s.repeat_on==='claim'?'claims':'objections'),
+        media:!!NEEDS_MEDIA[sec],asset:(bind&&kind==='claim')?bind.asset_id:''});
+    }});
+
+  /* cap */
+  var dropped=0;
+  if(A.cap_behavior==='drop_lowest'){
+    while(ROWS.length>A.max_sections){
+      var idx=-1;for(var i=ROWS.length-1;i>=0;i--){if(ROWS[i].step.droppable){idx=i;break}}
+      if(idx<0)break;ROWS.splice(idx,1);dropped++}
+    if(dropped)F.push(['warn','Cap applied','Dropped '+dropped+' section'+(dropped>1?'s':'')+
+      ' to stay under '+A.max_sections+'.'])}
+
+  var wins=ROWS.filter(function(r){return /prove_benefit|list_item/.test(r.step.role)}).length;
+  var defs=ROWS.filter(function(r){return r.step.role==='handle_objection'}).length;
+  if(wins&&defs>wins)F.push(['warn','Defensive page','More objection sections than reason sections.']);
+  var noimg=ROWS.filter(function(r){return r.media&&!r.asset}).length;
+  if(noimg)F.push(['warn','Missing images',noimg+' section'+(noimg>1?'s need':' needs')+' an image.']);
+
+  /* controlling idea check */
+  var idea=tokens($('idea').value);
+  if(hero&&idea.length){
+    var ht=tokens(hero.feature+' '+hero.benefit+' '+hero.emotion);
+    if(!idea.some(function(w){return ht.indexOf(w)>-1}))
+      F.push(['warn','Idea and hero disagree','Your controlling idea shares no words with the hero claim. One of the two is wrong.'])}
+
+  var errs=F.filter(function(f){return f[0]==='err'}),
+      warns=F.filter(function(f){return f[0]==='warn'});
+  var fh=errs.map(fl).join('');
+  if(warns.length)fh+='<details class="warns"'+(WOPEN?' open':'')+'>'+
+    '<summary><span class="ic">?</span><span>'+warns.length+' warning'+
+    (warns.length>1?'s':'')+'</span><span class="chev">\u203a</span></summary>'+
+    warns.map(fl).join('')+'</details>';
+  if(!errs.length&&!warns.length)
+    fh=fl(['ok','Clean','Nothing to fix. '+ROWS.length+' sections ready.']);
+  $('flags').innerHTML=fh;
+  var wd=$('flags').querySelector('details.warns');
+  if(wd)wd.addEventListener('toggle',function(){WOPEN=wd.open});
+
+  if(hard){ROWS=[];$('page').innerHTML='';$('meta').textContent='';
+    $('gen').disabled=true;$('gnote').textContent='Clear the errors';renderDetail();return}
+
+  renderPage();
+  $('meta').textContent=ROWS.length+' sections';
+  $('gen').disabled=false;
+  $('gnote').textContent=ROWS.length+' prompts, one per section';
+}
+
+function renderPage(){
+  $('page').innerHTML='<div class="thesis">'+esc($('idea').value||'no controlling idea')+'</div>'+
+   ROWS.map(function(r,i){
+    return (r.groupFirst?'<p class="rep">repeats \u00d7 '+r.gsize+' \u2014 '+r.gwhy+'</p>':'')+
+      '<div class="sect'+(SEL===i?' sel':'')+'" data-i="'+i+'" tabindex="0" role="button">'+
+      '<span class="idx">'+String(i+1).padStart(2,'0')+'</span>'+
+      (r.media&&!r.asset?'<span class="miss">no image</span>':'')+
+      wire(r.sec)+'</div>'}).join('');
+  document.querySelectorAll('.sect').forEach(function(el){
+    var go=function(){SEL=+el.dataset.i;renderPage();renderDetail()};
+    el.addEventListener('click',go);
+    el.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}})});
+}
+
+function renderDetail(){
+  var r=ROWS[SEL];
+  if(!r){$('dtitle').textContent='Section';$('dpos').textContent='';
+    $('detail').innerHTML='<p class="empty">Click a section in the page to inspect it.</p>';return}
+  var s=r.step;
+  $('dtitle').textContent=s.role_label;
+  $('dpos').textContent='position '+(SEL+1)+' of '+ROWS.length;
+
+  var bind='<span style="color:var(--muted)">nothing bound</span>';
+  if(r.kind==='claim'&&r.bind)
+    bind='<b>'+esc(r.bind.feature)+'</b>'+
+      (r.bind.benefit?'<br>'+esc(r.bind.benefit):'')+
+      (r.bind.emotion?'<br><span style="color:var(--muted)">'+esc(r.bind.emotion)+'</span>':'')+
+      (r.bind.proof?'<br><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">'+esc(r.bind.proof)+'</span>':'');
+  if(r.kind==='objection'&&r.bind)
+    bind='<b>'+esc(r.bind.objection)+'</b><br>'+esc(r.bind.rebuttal||'');
+  if(r.kind==='count')bind='<b>'+r.count+' reasons</b><br>The headline has to say this number';
+
+  $('detail').innerHTML=
+   '<dl class="kv">'+
+    '<dt>Job</dt><dd>'+esc(s.role_intent)+'</dd>'+
+    '<dt>Tone</dt><dd>'+esc(s.tone_note||'')+'</dd>'+
+    '<dt>Bound</dt><dd>'+bind+'</dd>'+
+    '<dt>Image</dt><dd>'+(r.media?(r.asset?'<span style="font-family:var(--mono);font-size:11.5px">'+esc(r.asset)+'</span>'
+        :'<span style="color:var(--amber)">needs one, no claim asset</span>')
+      :'<span style="color:var(--muted)">not required</span>')+'</dd>'+
+   '</dl>'+
+   '<p class="cap"><span>Layout</span></p><div id="layopts">'+
+    r.eligible.map(function(e){return '<button class="chip'+(e===r.sec?' on':'')+'" data-lay="'+e+'"'+
+      (r.eligible.length<2?' disabled':'')+'>'+e+'</button>'}).join('')+
+    (r.eligible.length<2?'<p class="hint">Only one layout is eligible for this role. Add more in arc_steps.</p>':'')+
+   '</div>'+
+   '<details class="slots"><summary>Copy slots \u00b7 '+
+    (s.copy_target||['headline','body']).length+'</summary><div style="padding-top:7px">'+
+    (s.copy_target||['headline','body']).map(function(t){return '<span class="slot">'+t+'</span>'}).join('')+
+    '</div></details>';
+
+  document.querySelectorAll('[data-lay]').forEach(function(b){
+    b.addEventListener('click',function(){OVERRIDE[r.key]=b.dataset.lay;build();renderDetail()})});
+}
+
+$('showall').addEventListener('click',function(){SHOWALL=!SHOWALL;build()});
+$('prod').addEventListener('change',function(){PIN=null;SHOWALL=false;paintProduct();build()});
+$('aw').addEventListener('change',function(){loadArcs();SHOWALL=false;build()});
+$('arc').addEventListener('change',function(){OVERRIDE={};SEL=null;SHOWALL=false;build()});
+$('idea').addEventListener('input',build);
+$('gen').addEventListener('click',function(){
+  $('gnote').textContent='Each section goes out separately, then one page pass for repetition'});
+})();
+</script>
+</body>
+</html>

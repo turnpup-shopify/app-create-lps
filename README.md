@@ -199,6 +199,28 @@ The framework is checked before it is used. A framework that would build a broke
 
 The rejection is whole because a half applied framework is harder to reason about than a known one. One consequence is worth stating plainly: **a `Spines` tab replaces the whole list, so it has to come with an `Awareness` tab that points into it.** Filling in `Spines` alone leaves the built in stages pointing at spines the sheet no longer has, and the whole thing falls back with a message naming the stage.
 
+### One flat tab for the framework
+
+Six named framework tabs are correct and tedious. The same six slices can live in one table keyed by a `type` column, exactly the way the content rows already work.
+
+In the nine tab layout, name that tab `Framework` and it wins over the six named ones. In the single tab layout, put the rows in the same table as the products and claims. Either way it is the same parser, the same cross checks and the same fallback.
+
+| column | used by | meaning |
+| ------ | ------- | ------- |
+| `type` | every row | `awareness`, `spine`, `slot`, `goal`, `section` or `setting`. Plurals read too. |
+| `id` | awareness, spine, goal, section | Stored in saved outlines, so keep it stable. |
+| `label` | awareness, spine, goal | The stage label, the spine name, the goal label. |
+| `lead` `why` `spine` | awareness | The lead instruction, the reason shown, and which spine the stage picks. |
+| `note` | spine | One line on when to reach for it. |
+| `spine` `key` `position` | slot | Which spine it belongs to, its unique key, and its order. |
+| `role` | slot, section | The section role shown on the slab. |
+| `job` | slot, section, goal | What the section does. On a goal row this is the close job. |
+| `key` `value` | setting | Currently only `late tags`. |
+
+Columns are shared where the meaning is, which keeps the table twelve wide rather than twenty. Leave a cell empty when the row's type does not use it.
+
+`sample/Framework.csv` holds the built in framework in exactly this shape. It is generated from the code by `tests/flat-framework.test.ts`, which also asserts it reads back as the identical framework, so it cannot drift.
+
 ### The single tab layout
 
 Used when `SHEET_CSV_URL` is set and `SHEET_ID` is not. It holds products, claims and worries in one flat table with a `type` column, and the framework is always the built in one.

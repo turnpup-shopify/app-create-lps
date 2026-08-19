@@ -29,6 +29,16 @@ export interface FrameworkTabs {
   settings?: string | null
 }
 
+/** The same six slices, already read into rows. */
+export interface FrameworkRows {
+  awareness?: Row[]
+  spines?: Row[]
+  slots?: Row[]
+  goals?: Row[]
+  sections?: Row[]
+  settings?: Row[]
+}
+
 export interface FrameworkResult {
   framework: Framework
   sources: FrameworkSources
@@ -268,16 +278,32 @@ export function crossCheck(framework: Framework): TabProblem[] {
  * framework is harder to reason about than a known one.
  */
 export function assembleFramework(tabs: FrameworkTabs): FrameworkResult {
+  return assembleFrameworkFromRows({
+    awareness: rowsOf(tabs.awareness),
+    spines: rowsOf(tabs.spines),
+    slots: rowsOf(tabs.slots),
+    goals: rowsOf(tabs.goals),
+    sections: rowsOf(tabs.sections),
+    settings: rowsOf(tabs.settings),
+  })
+}
+
+/**
+ * The same assembly from rows already read, so a single flat tab can supply the
+ * framework as well as six named ones. The rules and the fallback are identical
+ * either way, which is the point of the split.
+ */
+export function assembleFrameworkFromRows(sets: FrameworkRows): FrameworkResult {
   const problems: TabProblem[] = []
   const sources: FrameworkSources = { ...ALL_BUILT_IN }
 
-  const awareness = parseAwareness(rowsOf(tabs.awareness), problems)
-  const spineRows = rowsOf(tabs.spines)
-  const slotRows = rowsOf(tabs.slots)
+  const awareness = parseAwareness(sets.awareness ?? [], problems)
+  const spineRows = sets.spines ?? []
+  const slotRows = sets.slots ?? []
   const spines = spineRows.length > 0 ? parseSpines(spineRows, slotRows, problems) : null
-  const goals = parseGoals(rowsOf(tabs.goals), problems)
-  const sections = parseSections(rowsOf(tabs.sections), problems)
-  const settings = parseSettings(rowsOf(tabs.settings))
+  const goals = parseGoals(sets.goals ?? [], problems)
+  const sections = parseSections(sets.sections ?? [], problems)
+  const settings = parseSettings(sets.settings ?? [])
 
   if (awareness) sources.awareness = 'sheet'
   if (spines) sources.spines = 'sheet'

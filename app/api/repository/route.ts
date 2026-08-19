@@ -1,6 +1,12 @@
 import { ALL_BUILT_IN, DEFAULT_FRAMEWORK } from '@/lib/outline/framework'
-import { looksLikeCsv } from '@/lib/repository/csv'
-import { assembleFramework, type FrameworkTabs, type TabProblem } from '@/lib/repository/framework-tabs'
+import { looksLikeCsv, readRows } from '@/lib/repository/csv'
+import { frameworkRowsFromFlat, hasFrameworkRows } from '@/lib/repository/flat-framework'
+import {
+  assembleFramework,
+  assembleFrameworkFromRows,
+  type FrameworkTabs,
+  type TabProblem,
+} from '@/lib/repository/framework-tabs'
 import {
   parseClaimsTab,
   parseProductsTab,
@@ -83,6 +89,13 @@ export async function GET(request: Request) {
       )
     }
 
+    // The same table may also carry the framework, keyed by the type column, so
+    // one tab can hold everything rather than seven holding a slice each.
+    const rows = readRows(text)
+    const flat = hasFrameworkRows(rows)
+      ? assembleFrameworkFromRows(frameworkRowsFromFlat(rows))
+      : { framework: DEFAULT_FRAMEWORK, sources: ALL_BUILT_IN, problems: [] as TabProblem[] }
+
     return NextResponse.json({
       source: 'sheet',
       layout: 'single',
@@ -90,9 +103,9 @@ export async function GET(request: Request) {
       products: parsed.products,
       claims: parsed.claims,
       worries: parsed.worries,
-      framework: DEFAULT_FRAMEWORK,
-      sources: ALL_BUILT_IN,
-      problems: [],
+      framework: flat.framework,
+      sources: flat.sources,
+      problems: flat.problems,
       rowCount: parsed.rowCount,
       ignored: parsed.ignored,
     })
@@ -128,7 +141,13 @@ export async function GET(request: Request) {
     sections: texts.sections,
     settings: texts.settings,
   }
-  const { framework, sources, problems } = assembleFramework(tabs)
+
+  // One Framework tab beats six named ones when it is there, because a writer
+  // who filled it in meant it, and keeping both in play would be ambiguous.
+  const flatRows = texts.framework ? readRows(texts.framework) : []
+  const { framework, sources, problems } = hasFrameworkRows(flatRows)
+    ? assembleFrameworkFromRows(frameworkRowsFromFlat(flatRows))
+    : assembleFramework(tabs)
 
   // A missing content tab is worth naming, so a wrong tab name does not look
   // like an empty sheet. A missing framework tab is not a fault at all, because

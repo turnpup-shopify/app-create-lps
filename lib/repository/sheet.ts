@@ -17,6 +17,7 @@ export const TAB_NAMES = {
   sections: 'Sections',
   settings: 'Settings',
   references: 'References',
+  framework: 'Framework',
 } as const
 
 export type TabKey = keyof typeof TAB_NAMES

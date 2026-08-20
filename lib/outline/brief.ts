@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { findArchetype, type ArchetypeId } from './archetypes'
 import { DEFAULT_AWARENESS, findStage, isAwarenessId, type AwarenessId } from './awareness'
 import { DEFAULT_FRAMEWORK, type Framework } from './framework'
 import { DEFAULT_GOAL, findGoal, isGoalId, type GoalId } from './goals'
@@ -25,6 +26,8 @@ export interface Brief {
   spineOverride: SpineId | ''
   /** Section ids in the order the writer wants. */
   order: string[]
+  /** Which archetype manifest to use. */
+  archetype: ArchetypeId
 }
 
 export const BriefSchema = z.object({
@@ -38,6 +41,7 @@ export const BriefSchema = z.object({
   goal: z.string().default(DEFAULT_GOAL),
   spineOverride: z.string().default(''),
   order: z.array(z.string()).default([]),
+  archetype: z.string().default('listicle_a'),
 })
 
 export function emptyBrief(): Brief {
@@ -52,6 +56,7 @@ export function emptyBrief(): Brief {
     goal: DEFAULT_GOAL,
     spineOverride: '',
     order: [],
+    archetype: 'listicle_a',
   }
 }
 
@@ -67,7 +72,7 @@ export function emptyBrief(): Brief {
 export function normalizeBrief(value: unknown): Brief {
   const parsed = BriefSchema.safeParse(value)
   if (!parsed.success) return emptyBrief()
-  return parsed.data
+  return parsed.data as Brief
 }
 
 /** The stage, goal and spine a brief resolves to under a given framework. */

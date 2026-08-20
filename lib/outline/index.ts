@@ -1,3 +1,4 @@
+export * from './archetypes'
 export * from './awareness'
 export * from './brief'
 export * from './drift'

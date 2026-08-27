@@ -14,7 +14,7 @@ import {
   parseRepositoryCsv,
   parseWorriesTab,
 } from '@/lib/repository/parse'
-import { CONTENT_TABS, TAB_NAMES, isPublishId, sheetMode, tabUrl, type TabKey } from '@/lib/repository/sheet'
+import { CONTENT_TABS, FRAMEWORK_TABS, TAB_NAMES, isPublishId, sheetMode, tabUrl, type TabKey } from '@/lib/repository/sheet'
 import { NextResponse } from 'next/server'
 
 const NOT_CONFIGURED =
@@ -146,7 +146,22 @@ export async function GET(request: Request) {
 
   // One Framework tab beats six named ones when it is there, because a writer
   // who filled it in meant it, and keeping both in play would be ambiguous.
-  const flatRows = texts.framework ? readRows(texts.framework) : []
+  // When there is no Framework tab, any named tab that carries a type column
+  // with framework values is a flat framework table in disguise (commonly the
+  // Awareness tab holding awareness, spine, slot, goal and section rows in one
+  // table). Detect that and route through the flat pipeline so every row type
+  // reaches its own parser rather than all of them hitting parseAwareness.
+  let flatRows = texts.framework ? readRows(texts.framework) : []
+  if (!hasFrameworkRows(flatRows)) {
+    for (const key of FRAMEWORK_TABS) {
+      const text = texts[key]
+      if (!text) continue
+      const rows = readRows(text)
+      if (hasFrameworkRows(rows)) {
+        flatRows.push(...rows)
+      }
+    }
+  }
   const { framework, sources, problems } = hasFrameworkRows(flatRows)
     ? assembleFrameworkFromRows(frameworkRowsFromFlat(flatRows))
     : assembleFramework(tabs)

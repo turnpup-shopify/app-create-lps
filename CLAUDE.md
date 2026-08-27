@@ -4,6 +4,12 @@ Entry point for this repo. Read this before anything else.
 
 ---
 
+## Git
+
+The production branch is `claude/landing-page-outline-builder-6qgjun`. Push directly to it after making changes.
+
+---
+
 ## What this is
 
 A specification package for a system that builds Shopify landing pages for **Firstday**, a children's vitamin brand, at volume.

@@ -141,10 +141,19 @@ export async function GET(request: Request) {
   )
   const texts = Object.fromEntries(fetched) as Record<TabKey, string | null>
 
+  // Log which tabs were reached and how many bytes each returned.
+  const tabReport = keys.map((key) => {
+    const text = texts[key]
+    return `${TAB_NAMES[key]}: ${text === null ? 'null' : `${text.length}b`}`
+  })
+  console.log('[repository] tabs fetched:', tabReport.join(', '))
+
   const products = parseProductsTab(texts.products)
   const claims = parseClaimsTab(texts.claims)
   const worries = parseWorriesTab(texts.worries)
   const assets = parseAssetsTab(texts.assets)
+
+  console.log('[repository] content:', products.length, 'products,', claims.length, 'claims,', worries.length, 'worries')
 
   const tabs: FrameworkTabs = {
     awareness: texts.awareness,
@@ -163,7 +172,8 @@ export async function GET(request: Request) {
   // table). Detect that and route through the flat pipeline so every row type
   // reaches its own parser rather than all of them hitting parseAwareness.
   let flatRows = texts.framework ? readRows(texts.framework) : []
-  if (!hasFrameworkRows(flatRows)) {
+  const frameworkFromTab = hasFrameworkRows(flatRows)
+  if (!frameworkFromTab) {
     for (const key of FRAMEWORK_TABS) {
       const text = texts[key]
       if (!text) continue
@@ -173,9 +183,20 @@ export async function GET(request: Request) {
       }
     }
   }
-  const { framework, sources, problems } = hasFrameworkRows(flatRows)
+  const usedFlat = hasFrameworkRows(flatRows)
+  console.log('[repository] framework path:', frameworkFromTab ? 'Framework tab' : usedFlat ? 'flat rows in named tab' : 'individual tabs')
+  if (usedFlat) {
+    console.log('[repository] flat rows:', flatRows.length, 'total,', flatRows.filter(r => r.type?.toLowerCase() === 'awareness').length, 'awareness')
+  }
+
+  const { framework, sources, problems } = usedFlat
     ? assembleFrameworkFromRows(frameworkRowsFromFlat(flatRows))
     : assembleFramework(tabs)
+
+  console.log('[repository] framework sources:', JSON.stringify(sources))
+  if (problems.length > 0) {
+    console.log('[repository] problems:', problems.map(p => `${p.tab}: ${p.message.slice(0, 80)}`).join(' | '))
+  }
 
   // A missing content tab is worth naming, so a wrong tab name does not look
   // like an empty sheet. A missing framework tab is not a fault at all, because
@@ -187,6 +208,16 @@ export async function GET(request: Request) {
     message: 'Not found in the sheet, so nothing was read from it.',
   }))
 
+  const _debug = {
+    mode,
+    tabsFound: Object.fromEntries(keys.map((key) => [TAB_NAMES[key], texts[key] !== null ? `${texts[key]!.length}b` : null])),
+    frameworkPath: frameworkFromTab ? 'Framework tab' : usedFlat ? 'flat rows in named tab' : 'individual tabs',
+    flatRowCount: flatRows.length,
+    contentCounts: { products: products.length, claims: claims.length, worries: worries.length },
+    sources,
+    problemCount: problems.length,
+  }
+
   const reachedAnyTab = keys.some((key) => texts[key] !== null)
   if (!reachedAnyTab) {
     return NextResponse.json(
@@ -196,6 +227,7 @@ export async function GET(request: Request) {
         framework: DEFAULT_FRAMEWORK,
         sources: ALL_BUILT_IN,
         problems: [],
+        _debug,
       },
       { status: 502 },
     )
@@ -212,6 +244,7 @@ export async function GET(request: Request) {
         framework,
         sources,
         problems: [...missing, ...problems],
+        _debug,
       },
       { status: 502 },
     )
@@ -228,5 +261,6 @@ export async function GET(request: Request) {
     framework,
     sources,
     problems: [...missing, ...problems],
+    _debug,
   })
 }

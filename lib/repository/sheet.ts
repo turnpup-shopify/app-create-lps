@@ -66,5 +66,5 @@ export function isPublishId(value: string): boolean {
 
 export function tabUrl(sheetId: string, tab: string, env: NodeJS.ProcessEnv = process.env): string {
   const id = readSheetId(sheetId)
-  return `${sheetsHost(env)}/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`
+  return `${sheetsHost(env)}/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(tab)}`
 }

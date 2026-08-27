@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { Claim, Product, Repository, Worry } from '@/lib/outline/types'
+import type { Asset, Claim, ClaimScope, Product, Repository, Worry } from '@/lib/outline/types'
 import { cell, isBlank, readRows, type Row } from './csv'
 
 /**
@@ -123,14 +123,21 @@ export function parseRepositoryCsv(text: string): ParseResult {
     const id = makeId(type, scope, row.label, cell(raw, 'id'), taken)
 
     if (type === 'claim') {
-      claims.push({ id, product: scope, label: row.label, detail: row.detail })
+      claims.push({
+        id, product: scope, label: row.label, detail: row.detail,
+        scope: 'reason', strength: 3, awareness: [], kills_objection: [],
+        emotion: '', proof: '', proof_source: '', asset_id: '',
+      })
       continue
     }
 
-    worries.push({ id, product: scope, label: row.label, detail: row.detail, tags: row.tags })
+    worries.push({
+      id, product: scope, label: row.label, detail: row.detail, tags: row.tags,
+      severity: 3, category: '',
+    })
   }
 
-  return { products, claims, worries, rowCount: rows.length, ignored }
+  return { products, claims, worries, assets: [], rowCount: rows.length, ignored }
 }
 
 /* ------------------------------------------------------------------ */
@@ -153,42 +160,79 @@ export function parseProductsTab(text: string | null | undefined): Product[] {
   return products
 }
 
-/** Claims tab. Columns id, product, label, detail. */
+function csvList(value: string): string[] {
+  return value.split(',').map((s) => s.trim()).filter((s) => s !== '')
+}
+
+function clampScope(value: string): ClaimScope {
+  const v = value.trim().toLowerCase()
+  if (v === 'spec' || v === 'detail') return v
+  return 'reason'
+}
+
+/** Claims tab. Reads the full sheet spec columns when present. */
 export function parseClaimsTab(text: string | null | undefined): Claim[] {
   const claims: Claim[] = []
   const taken = new Set<string>()
   for (const row of usable(text)) {
-    const label = cell(row, 'label', 'claim')
+    const label = cell(row, 'label', 'claim', 'feature')
     if (!label) continue
-    const scope = cell(row, 'product') || '*'
+    const scope = cell(row, 'product', 'product_id') || '*'
+    const strengthRaw = cell(row, 'strength')
     claims.push({
-      id: makeId('claim', scope, label, cell(row, 'id'), taken),
+      id: makeId('claim', scope, label, cell(row, 'id', 'claim_id'), taken),
       product: scope,
       label,
-      detail: cell(row, 'detail', 'support'),
+      detail: cell(row, 'detail', 'support', 'benefit'),
+      scope: clampScope(cell(row, 'scope')),
+      strength: strengthRaw ? (parseInt(strengthRaw, 10) || 3) : 3,
+      awareness: csvList(cell(row, 'awareness')),
+      kills_objection: csvList(cell(row, 'kills_objection')),
+      emotion: cell(row, 'emotion'),
+      proof: cell(row, 'proof'),
+      proof_source: cell(row, 'proof_source'),
+      asset_id: cell(row, 'asset_id'),
     })
   }
   return claims
 }
 
-/** Worries tab. Columns id, product, label, answer, tags. */
+/** Worries / objections tab. Reads severity and category when present. */
 export function parseWorriesTab(text: string | null | undefined): Worry[] {
   const worries: Worry[] = []
   const taken = new Set<string>()
   for (const row of usable(text)) {
-    const label = cell(row, 'label', 'worry')
+    const label = cell(row, 'label', 'worry', 'objection')
     if (!label) continue
-    const scope = cell(row, 'product') || '*'
+    const scope = cell(row, 'product', 'product_id') || '*'
+    const severityRaw = cell(row, 'severity')
     worries.push({
-      id: makeId('worry', scope, label, cell(row, 'id'), taken),
+      id: makeId('worry', scope, label, cell(row, 'id', 'objection_id'), taken),
       product: scope,
       label,
-      // The column is named answer now. detail is still read so an older sheet works.
-      detail: cell(row, 'answer', 'detail'),
+      detail: cell(row, 'answer', 'detail', 'rebuttal'),
       tags: cell(row, 'tags'),
+      severity: severityRaw ? (parseInt(severityRaw, 10) || 3) : 3,
+      category: cell(row, 'category'),
     })
   }
   return worries
+}
+
+/** Assets tab. */
+export function parseAssetsTab(text: string | null | undefined): Asset[] {
+  const assets: Asset[] = []
+  for (const row of usable(text)) {
+    const id = cell(row, 'asset_id', 'id')
+    if (!id) continue
+    assets.push({
+      asset_id: id,
+      orientation: cell(row, 'orientation'),
+      crops: csvList(cell(row, 'crops')),
+      proves_claim: cell(row, 'proves_claim'),
+    })
+  }
+  return assets
 }
 
 /* ------------------------------------------------------------------ */

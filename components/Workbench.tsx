@@ -2,22 +2,22 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PillRow } from './PillRow'
 import {
   RepositoryStep,
   type RepositoryLayout,
   type RepositorySource,
   type RepositoryStatus,
 } from './RepositoryStep'
-import { SectionSlab } from './SectionSlab'
-import { SlotSlab, SlotDetail, type SlotAssignment } from './SlotSlab'
+import { SectionWire } from './Wireframe'
+import { SlotDetail, type SlotAssignment } from './SlotSlab'
 import {
   ARCHETYPE_LIST,
   findArchetype,
+  numberedClaimSlots,
+  visibleSlots,
   type ArchetypeId,
 } from '@/lib/outline/archetypes'
 import {
-  activeSpine,
   missingIds,
   resolveBrief,
   selectedClaims,
@@ -27,24 +27,18 @@ import {
 } from '@/lib/outline/brief'
 import { DEFAULT_FRAMEWORK, type Framework, type FrameworkSources } from '@/lib/outline/framework'
 import { driftCount, missingHeadings, signatures, type Signatures } from '@/lib/outline/drift'
-import { toMarkdown } from '@/lib/outline/markdown'
-import { moveSection, nudgeSection } from '@/lib/outline/order'
 import {
-  assignWorry,
   ownSectionId,
-  placedCount,
   unassignWorry,
-  unplacedWorries,
   validSlotIds,
 } from '@/lib/outline/placement'
-import { buildStructure, heroId, sectionIds } from '@/lib/outline/structure'
+import { buildStructure, sectionIds } from '@/lib/outline/structure'
 import { reconcileCopy, type WrittenCopy } from '@/lib/outline/copy'
 import type { BriefReference } from '@/lib/outline/brief'
-import { emptyRepository, type Headings, type Repository } from '@/lib/outline/types'
+import { emptyRepository, type Claim, type Headings, type Repository, type Worry } from '@/lib/outline/types'
 import type { TabProblem } from '@/lib/repository/framework-tabs'
 import { claimsInScope, parseRepositoryCsv, worriesInScope } from '@/lib/repository/parse'
 
-const COPY_FAILED = 'The outline could not be copied. Select it and copy it by hand.'
 const NO_PASTE = 'Nothing usable in that paste. Include the header row and at least one product row.'
 const HEADINGS_FAILED = 'The headings could not be written just now. The structure below is still correct.'
 const SAVE_FAILED = 'The outline could not be saved. Try again in a moment.'
@@ -52,6 +46,118 @@ const SAVE_FAILED = 'The outline could not be saved. Try again in a moment.'
 function toggle(list: string[], id: string): string[] {
   return list.includes(id) ? list.filter((item) => item !== id) : [...list, id]
 }
+
+/* ------------------------------------------------------------------ */
+/* Strength / severity bar                                             */
+/* ------------------------------------------------------------------ */
+
+function StrengthBar({ value, max = 5, variant = 'claim' }: { value: number; max?: number; variant?: 'claim' | 'objection' }) {
+  return (
+    <span className={`strength-bar ${variant === 'objection' ? 'severity-bar' : ''}`}>
+      {Array.from({ length: max }, (_, i) => (
+        <span key={i} data-filled={i < value ? 'true' : undefined} />
+      ))}
+    </span>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Validation helpers                                                  */
+/* ------------------------------------------------------------------ */
+
+interface Flag {
+  level: 'err' | 'warn'
+  title: string
+  message: string
+}
+
+function buildFlags(
+  archetype: ReturnType<typeof findArchetype>,
+  pickedClaims: Claim[],
+  pickedWorries: Worry[],
+  slotAssignments: SlotAssignment[],
+  controllingIdea: string,
+  productCount: number,
+): Flag[] {
+  const flags: Flag[] = []
+
+  if (pickedClaims.length === 0 && productCount > 0) {
+    flags.push({ level: 'err', title: 'No claims', message: 'Check at least one claim.' })
+  }
+
+  if (archetype.maxClaims && pickedClaims.length > archetype.maxClaims) {
+    const over = pickedClaims.length - archetype.maxClaims
+    flags.push({
+      level: 'err',
+      title: 'Too many claims',
+      message: `This archetype has ${archetype.maxClaims} numbered slots. Uncheck ${over}.`,
+    })
+  }
+
+  const numSlots = numberedClaimSlots(archetype)
+  if (pickedClaims.length > 0 && pickedClaims.length < numSlots) {
+    const empty = numSlots - pickedClaims.length
+    flags.push({
+      level: 'warn',
+      title: 'Unfilled slots',
+      message: `${empty} numbered slot${empty > 1 ? 's' : ''} will be empty or disabled.`,
+    })
+  }
+
+  // Unanswered objection check (the highest value output per 04-outline-logic.md)
+  for (const worry of pickedWorries) {
+    const answered = pickedClaims.some((c) =>
+      c.kills_objection.includes(worry.id),
+    )
+    if (!answered) {
+      flags.push({
+        level: 'warn',
+        title: `Unanswered: "${worry.label.slice(0, 40)}${worry.label.length > 40 ? '...' : ''}"`,
+        message: 'No selected claim lists this objection in kills_objection.',
+      })
+    }
+  }
+
+  if (pickedWorries.length > 0 && pickedClaims.length > 0 && pickedWorries.length > pickedClaims.length) {
+    flags.push({
+      level: 'warn',
+      title: 'Defensive page',
+      message: 'More objections selected than claims. The page argues more than it sells.',
+    })
+  }
+
+  const missingImages = slotAssignments.filter(
+    (a) => a.active && a.slot.needsMedia && !a.assetId && a.slot.content !== 'none',
+  ).length
+  if (missingImages > 0) {
+    flags.push({
+      level: 'warn',
+      title: 'Missing images',
+      message: `${missingImages} slot${missingImages > 1 ? 's need' : ' needs'} an image.`,
+    })
+  }
+
+  // Controlling idea vs hero claim word overlap
+  if (controllingIdea.trim() && pickedClaims.length > 0) {
+    const ideaWords = new Set(controllingIdea.toLowerCase().split(/\s+/).filter((w) => w.length > 3))
+    const heroLabel = pickedClaims[0].label.toLowerCase()
+    const heroWords = new Set(heroLabel.split(/\s+/).filter((w) => w.length > 3))
+    const overlap = [...ideaWords].filter((w) => heroWords.has(w))
+    if (ideaWords.size > 0 && overlap.length === 0) {
+      flags.push({
+        level: 'warn',
+        title: 'Idea and hero disagree',
+        message: 'The controlling idea shares no significant words with the hero claim. One of the two may be wrong.',
+      })
+    }
+  }
+
+  return flags
+}
+
+/* ------------------------------------------------------------------ */
+/* Main component                                                      */
+/* ------------------------------------------------------------------ */
 
 export function Workbench({
   initialId,
@@ -84,16 +190,13 @@ export function Workbench({
   const [headingError, setHeadingError] = useState<string | null>(null)
   const [corrections, setCorrections] = useState<string[]>([])
   const [references, setReferences] = useState<BriefReference[]>([])
-  const [referenceProblems, setReferenceProblems] = useState<{ url: string; message: string }[]>([])
-  const [skim, setSkim] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [trayFor, setTrayFor] = useState<string | null>(null)
-  const [dragId, setDragId] = useState<string | null>(null)
-  const [overId, setOverId] = useState<string | null>(null)
-  const [announcement, setAnnouncement] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
+  const [setupOpen, setSetupOpen] = useState(true)
+  const [objectionsOpen, setObjectionsOpen] = useState(false)
+  const [showIneligible, setShowIneligible] = useState(false)
+  const [warningsOpen, setWarningsOpen] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
 
   const patch = useCallback((change: Partial<Brief>) => {
@@ -110,8 +213,6 @@ export function Workbench({
     try {
       const response = await fetch(`/api/repository${fresh ? '?fresh=1' : ''}`)
       const body = await response.json()
-      // The framework travels even on a failure, so a dead content tab does not
-      // also cost the writer their spines.
       if (body.framework) setFramework(body.framework as Framework)
       if (body.sources) setSources(body.sources as FrameworkSources)
       setProblems(Array.isArray(body.problems) ? body.problems : [])
@@ -121,7 +222,12 @@ export function Workbench({
         setSheet(body.sheet ?? null)
         return
       }
-      setRepository({ products: body.products, claims: body.claims, worries: body.worries })
+      setRepository({
+        products: body.products,
+        claims: body.claims,
+        worries: body.worries,
+        assets: body.assets ?? [],
+      })
       setSource('sheet')
       setSheet(body.sheet ?? null)
       setLayout(body.layout === 'tabs' || body.layout === 'single' ? body.layout : null)
@@ -132,12 +238,8 @@ export function Workbench({
     }
   }, [])
 
-  useEffect(() => {
-    void load(false)
-  }, [load])
+  useEffect(() => { void load(false) }, [load])
 
-  // Reference pages are read once and shown, so the writer knows what is
-  // informing the copy and which pages could not be read.
   useEffect(() => {
     let cancelled = false
     void (async () => {
@@ -157,14 +259,11 @@ export function Workbench({
               }))
             : [],
         )
-        setReferenceProblems(Array.isArray(body.problems) ? body.problems : [])
       } catch {
-        // Reference pages are an aid, so failing to read them changes nothing.
+        // Reference pages are an aid, not required.
       }
     })()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [])
 
   const readPaste = useCallback((text: string): string | null => {
@@ -172,7 +271,7 @@ export function Workbench({
     if (parsed.products.length === 0 && parsed.claims.length === 0 && parsed.worries.length === 0) {
       return NO_PASTE
     }
-    setRepository({ products: parsed.products, claims: parsed.claims, worries: parsed.worries })
+    setRepository({ products: parsed.products, claims: parsed.claims, worries: parsed.worries, assets: [] })
     setSource('paste')
     setStatus('ready')
     setRepoMessage(null)
@@ -185,47 +284,54 @@ export function Workbench({
 
   const resolved = resolveBrief(brief, framework)
   const stage = resolved.stage
-  const spine = resolved.spine
-  const spineId = spine.id
-  const goal = resolved.goal
-
-  const scopedClaims = useMemo(() => claimsInScope(repository, brief.products), [repository, brief.products])
-  const scopedWorries = useMemo(() => worriesInScope(repository, brief.products), [repository, brief.products])
-
-  const pickedClaims = useMemo(() => selectedClaims(brief, repository), [brief, repository])
-  const pickedWorries = useMemo(() => selectedWorries(brief, repository), [brief, repository])
-  const gone = useMemo(() => missingIds(brief, repository), [brief, repository])
-
-  const valid = useMemo(() => validSlotIds({ spine: spineId, framework }), [spineId, framework])
-
-  const sections = useMemo(
-    () =>
-      buildStructure({
-        spine: spineId,
-        goal: brief.goal,
-        worries: pickedWorries,
-        assignments: brief.assignments,
-        order: brief.order,
-        framework,
-      }),
-    [spineId, brief.goal, brief.assignments, brief.order, pickedWorries, framework],
-  )
-
-  const unplaced = useMemo(
-    () => unplacedWorries(pickedWorries, brief.assignments, valid),
-    [pickedWorries, brief.assignments, valid],
-  )
-
-  /* ---------------------------------------------------------------- */
-  /* Archetype slot assignment                                        */
-  /* ---------------------------------------------------------------- */
+  const spineId = resolved.spine.id
 
   const archetype = useMemo(() => findArchetype(brief.archetype), [brief.archetype])
 
-  const slotAssignments = useMemo((): SlotAssignment[] => {
-    // Sort claims by strength (if available) descending, then by selection order
-    const claimPool = [...pickedClaims]
+  // Filter claims by product scope
+  const scopedClaims = useMemo(() => claimsInScope(repository, brief.products), [repository, brief.products])
+  const scopedWorries = useMemo(() => worriesInScope(repository, brief.products), [repository, brief.products])
 
+  // Filter claims by awareness stage (per 04-outline-logic.md rule 2)
+  const eligibleClaims = useMemo(() => {
+    return scopedClaims.filter((c) => {
+      if (!c.awareness || c.awareness.length === 0) return true
+      return c.awareness.includes(brief.awareness)
+    }).filter((c) => {
+      if (archetype.reasonOnly && c.scope !== 'reason') return false
+      return true
+    })
+  }, [scopedClaims, brief.awareness, archetype.reasonOnly])
+
+  const ineligibleClaims = useMemo(() => {
+    return scopedClaims.filter((c) => !eligibleClaims.some((e) => e.id === c.id))
+  }, [scopedClaims, eligibleClaims])
+
+  const pickedClaims = useMemo(() => {
+    const selected = selectedClaims(brief, repository)
+    // Sort by strength descending, ties on id (per 04-outline-logic.md)
+    return [...selected].sort((a, b) => {
+      if (b.strength !== a.strength) return b.strength - a.strength
+      return a.id.localeCompare(b.id)
+    })
+  }, [brief, repository])
+
+  const pickedWorries = useMemo(() => {
+    const selected = selectedWorries(brief, repository)
+    return [...selected].sort((a, b) => {
+      if (b.severity !== a.severity) return b.severity - a.severity
+      return a.id.localeCompare(b.id)
+    })
+  }, [brief, repository])
+
+  const gone = useMemo(() => missingIds(brief, repository), [brief, repository])
+
+  /* ---------------------------------------------------------------- */
+  /* Archetype slot assignment (04-outline-logic.md rules 3-8)         */
+  /* ---------------------------------------------------------------- */
+
+  const slotAssignments = useMemo((): SlotAssignment[] => {
+    const claimPool = [...pickedClaims]
     const assignments: SlotAssignment[] = []
 
     for (const slot of archetype.slots) {
@@ -240,18 +346,20 @@ export function Workbench({
       }
 
       if (slot.kind === 'fixed' || slot.content === 'none' || slot.content === 'controlling_idea') {
-        // Nothing to assign from the pool
+        // Nothing to assign
       } else if (slot.content === 'top_claim') {
         if (claimPool.length) {
           const c = claimPool.shift()!
           entry.claimIds = [c.id]
           entry.claims = [c]
+          entry.assetId = c.asset_id || ''
         }
       } else if (slot.content === 'claim' && (slot.kind === 'numbered' || slot.kind === 'single')) {
         if (claimPool.length) {
           const c = claimPool.shift()!
           entry.claimIds = [c.id]
           entry.claims = [c]
+          entry.assetId = c.asset_id || ''
         } else if (slot.kind === 'numbered') {
           entry.active = false
         }
@@ -263,11 +371,16 @@ export function Workbench({
         entry.objectionIds = pickedWorries.map((o) => o.id)
         entry.objections = [...pickedWorries]
       } else if (slot.content === 'close') {
-        // Close restates the hero claim
         if (pickedClaims.length) {
           entry.claimIds = [pickedClaims[0].id]
           entry.claims = [pickedClaims[0]]
         }
+      }
+
+      // Resolve asset from claim when not already set
+      if (slot.needsMedia && !entry.assetId && entry.claims.length > 0) {
+        const claimAsset = entry.claims.find((c) => c.asset_id)?.asset_id
+        if (claimAsset) entry.assetId = claimAsset
       }
 
       assignments.push(entry)
@@ -276,84 +389,36 @@ export function Workbench({
     return assignments
   }, [archetype, pickedClaims, pickedWorries])
 
-  const activeSlotCount = slotAssignments.filter((a) => a.active && a.slot.kind !== 'fixed').length
-  const disabledSlots = slotAssignments.filter((a) => !a.active).map((a) => a.slot.key)
+  const archetypeFlags = useMemo(
+    () => buildFlags(archetype, pickedClaims, pickedWorries, slotAssignments, brief.idea, brief.products.length),
+    [archetype, pickedClaims, pickedWorries, slotAssignments, brief.idea, brief.products.length],
+  )
 
-  // Archetype validation flags
-  const archetypeFlags = useMemo(() => {
-    const flags: { level: 'err' | 'warn'; title: string; message: string }[] = []
+  const errors = archetypeFlags.filter((f) => f.level === 'err')
+  const warnings = archetypeFlags.filter((f) => f.level === 'warn')
+  const hasErrors = errors.length > 0
 
-    if (pickedClaims.length === 0 && brief.products.length > 0) {
-      flags.push({ level: 'err', title: 'No claims', message: 'Check at least one claim.' })
-    }
-
-    if (archetype.maxClaims && pickedClaims.length > archetype.maxClaims) {
-      const over = pickedClaims.length - archetype.maxClaims
-      flags.push({
-        level: 'err',
-        title: 'Too many claims',
-        message: `This archetype has ${archetype.maxClaims} numbered slots. Uncheck ${over}.`,
-      })
-    }
-
-    const numSlots = archetype.slots.filter((s) => s.kind === 'numbered' && s.content === 'claim').length
-    if (pickedClaims.length > 0 && pickedClaims.length < numSlots) {
-      const empty = numSlots - pickedClaims.length
-      flags.push({
-        level: 'warn',
-        title: 'Unfilled slots',
-        message: `${empty} numbered slot${empty > 1 ? 's' : ''} will be empty.`,
-      })
-    }
-
-    // Unanswered objections
-    for (const worry of pickedWorries) {
-      const answered = pickedClaims.some((c) => c.detail.toLowerCase().includes(worry.label.toLowerCase().slice(0, 20)))
-      // This is a rough heuristic; the real check would use kills_objection linkage
-      void answered
-    }
-
-    if (pickedWorries.length > 0 && pickedClaims.length > 0 && pickedWorries.length > pickedClaims.length) {
-      flags.push({
-        level: 'warn',
-        title: 'Defensive page',
-        message: 'More objections selected than claims.',
-      })
-    }
-
-    const missingImages = slotAssignments.filter(
-      (a) => a.active && a.slot.needsMedia && !a.assetId && a.slot.content !== 'none',
-    ).length
-    if (missingImages > 0) {
-      flags.push({
-        level: 'warn',
-        title: 'Missing images',
-        message: `${missingImages} slot${missingImages > 1 ? 's need' : ' needs'} an image.`,
-      })
-    }
-
-    return flags
-  }, [archetype, pickedClaims, pickedWorries, slotAssignments, brief.products.length])
-
-  const hasErrors = archetypeFlags.some((f) => f.level === 'err')
+  // Spine outline kept for copy generation
+  const valid = useMemo(() => validSlotIds({ spine: spineId, framework }), [spineId, framework])
+  const sections = useMemo(
+    () =>
+      buildStructure({
+        spine: spineId,
+        goal: brief.goal,
+        worries: pickedWorries,
+        assignments: brief.assignments,
+        order: brief.order,
+        framework,
+      }),
+    [spineId, brief.goal, brief.assignments, brief.order, pickedWorries, framework],
+  )
 
   const ready = brief.products.length > 0 && pickedClaims.length > 0
-  const unwritten = missingHeadings(sections, headings)
-  const drifted = driftCount(sections, pass, headings)
-  const placed = placedCount(pickedWorries, brief.assignments, valid)
 
-  /**
-   * A reopened outline already holds the headings from its last pass, so the
-   * structure it loads with is the baseline. Without this every section would
-   * read as drifted the moment the page opened.
-   */
   const baselined = useRef(false)
   useEffect(() => {
     if (baselined.current) return
-    if (Object.keys(initialHeadings).length === 0) {
-      baselined.current = true
-      return
-    }
+    if (Object.keys(initialHeadings).length === 0) { baselined.current = true; return }
     if (status !== 'ready') return
     baselined.current = true
     setPass(signatures(sections))
@@ -368,10 +433,14 @@ export function Workbench({
   }
 
   function toggleClaim(id: string) {
+    // Auto-collapse setup on first claim toggle (06-ui-spec.md)
+    if (setupOpen && brief.claims.length === 0) setSetupOpen(false)
+    setSelectedSlot(null)
     patch({ claims: toggle(brief.claims, id) })
   }
 
   function toggleWorry(id: string) {
+    setSelectedSlot(null)
     setBrief((current) => {
       const on = current.worries.includes(id)
       return {
@@ -387,59 +456,14 @@ export function Workbench({
     })
   }
 
-  function assign(worryId: string, slotId: string) {
-    setBrief((current) => ({ ...current, assignments: assignWorry(current.assignments, worryId, slotId) }))
-    setTrayFor(null)
-    // The own section for this worry may appear or vanish, so its heading is void.
-    setHeadings((current) => {
-      const next = { ...current }
-      delete next[ownSectionId(worryId)]
-      return next
-    })
-  }
-
-  function reorder(next: string[], movedId: string) {
-    patch({ order: next })
-    const position = next.indexOf(movedId) + 1
-    const role = sections.find((section) => section.id === movedId)?.role ?? 'Section'
-    setAnnouncement(`${role} moved to position ${position} of ${next.length}.`)
-  }
-
-  function nudge(id: string, direction: -1 | 1) {
-    reorder(nudgeSection(sectionIds(sections), id, direction, heroId(sections)), id)
-  }
-
-  /**
-   * Which edge of a section the dragged one would land on. Dragging down lands
-   * after the target, dragging up lands before it, so the line has to follow.
-   */
-  function dropEdgeFor(sectionId: string, index: number): 'before' | 'after' | null {
-    if (!dragId || overId !== sectionId || dragId === sectionId) return null
-    const from = sections.findIndex((section) => section.id === dragId)
-    return from > index ? 'before' : 'after'
-  }
-
-  function dropOn(targetId: string) {
-    const current = sectionIds(sections)
-    if (!dragId || dragId === targetId) {
-      setDragId(null)
-      setOverId(null)
-      return
-    }
-    reorder(moveSection(current, dragId, current.indexOf(targetId), heroId(sections)), dragId)
-    setDragId(null)
-    setOverId(null)
-  }
-
   /* ---------------------------------------------------------------- */
-  /* The copy pass                                                     */
+  /* Copy generation                                                   */
   /* ---------------------------------------------------------------- */
 
   async function writeHeadings() {
     setWorking(true)
     setHeadingError(null)
     setCorrections([])
-    setSkim(false)
 
     const payload = toHeadingBrief({ ...brief, order: sectionIds(sections) }, repository, sections, framework)
     if (references.length > 0) payload.references = references
@@ -454,7 +478,6 @@ export function Workbench({
       const written: WrittenCopy[] = Array.isArray(body.sections) ? body.sections : []
 
       if (written.length > 0) {
-        // Held to what each section type can render before it reaches the page.
         const { headings: next, corrections } = reconcileCopy(sections, written)
         setHeadings(next)
         setPass(signatures(sections))
@@ -470,17 +493,6 @@ export function Workbench({
     }
   }
 
-  async function copyMarkdown() {
-    const markdown = toMarkdown({ sections, headings, headingsOnly: skim })
-    try {
-      await navigator.clipboard.writeText(markdown)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1600)
-    } catch {
-      setSaveMessage(COPY_FAILED)
-    }
-  }
-
   async function save() {
     const trimmed = name.trim()
     if (!trimmed) {
@@ -488,7 +500,6 @@ export function Workbench({
       nameRef.current?.focus()
       return
     }
-
     setSaving(true)
     setSaveMessage(null)
     const body = JSON.stringify({
@@ -496,7 +507,6 @@ export function Workbench({
       brief: { ...brief, order: sectionIds(sections) },
       headings,
     })
-
     try {
       const response = await fetch(outlineId ? `/api/outlines/${outlineId}` : '/api/outlines', {
         method: outlineId ? 'PUT' : 'POST',
@@ -525,21 +535,13 @@ export function Workbench({
   /* Render                                                            */
   /* ---------------------------------------------------------------- */
 
-  return (
-    <main className="mx-auto w-full max-w-[1180px] px-4 pt-8 pb-24 sm:px-6 sm:pt-10">
-      <header className="mb-8 border-b border-rule pb-5">
-        <Link className="label no-underline hover:text-ink" href="/">
-          All outlines
-        </Link>
-        <h1 className="masthead mt-2">Outline Builder</h1>
-        <p className="mt-2.5 max-w-[48ch] text-muted">
-          Pick the archetype, select claims and objections, and the builder assigns them to slots.
-        </p>
-      </header>
+  const visSlots = visibleSlots(archetype)
 
-      <div className="grid grid-cols-1 items-start gap-8 min-[940px]:grid-cols-2 min-[940px]:gap-11">
-        {/* ------------------------- left ------------------------- */}
-        <div>
+  return (
+    <>
+      {/* Repository loader above the three panes */}
+      {status !== 'ready' && (
+        <div className="mx-auto max-w-[600px] px-4 pt-8 pb-4">
           <RepositoryStep
             status={status}
             source={source}
@@ -556,99 +558,67 @@ export function Workbench({
             onRefresh={() => void load(true)}
             onReadPaste={readPaste}
           />
+        </div>
+      )}
 
-          <section className="border-t border-rule pt-5 pb-1">
-            <span className="step-number">02</span>
-            <h2 className="section-title mt-1">What the page is about</h2>
-            <p className="hint mt-1 mb-3.5">One or two lines. Enough for the headings to sound like your page.</p>
-            <label className="label mb-1.5 block" htmlFor="idea">
-              The page in a line
-            </label>
-            <textarea
-              id="idea"
-              className="field"
-              placeholder="A page for the brass pull collection aimed at people mid renovation"
-              value={brief.idea}
-              onChange={(event) => patch({ idea: event.target.value })}
-            />
-            <div className="mt-2.5">
-              <label className="label mb-1.5 block" htmlFor="audience">
-                Who lands here
-              </label>
-              <input
-                id="audience"
-                className="field"
-                placeholder="Homeowners replacing hardware themselves"
-                value={brief.audience}
-                onChange={(event) => patch({ audience: event.target.value })}
-              />
-            </div>
-          </section>
+      <div className="three-pane">
+        {/* ============================================================ */}
+        {/* LEFT PANE: Pick                                               */}
+        {/* ============================================================ */}
+        <div className="pane-left">
+          <Link className="label no-underline hover:text-ink" href="/">All outlines</Link>
 
-          <section className="border-t border-rule pt-5 pb-1">
-            <span className="step-number">03</span>
-            <h2 className="section-title mt-1">Products</h2>
-            <p className="hint mt-1 mb-3.5">Pick one or more. Claims and worries below narrow to match.</p>
-            <PillRow
-              items={repository.products.map((product) => ({
-                id: product.id,
-                label: product.label,
-                detail: product.detail,
-              }))}
-              selected={brief.products}
-              missing={gone.products}
-              onToggle={toggleProduct}
-              empty="No product rows in the repository yet. Add one to the sheet, then refresh."
-            />
-          </section>
+          {/* ---- Setup (collapsible per 06-ui-spec.md) ---- */}
+          <details open={setupOpen} onToggle={(e) => setSetupOpen((e.target as HTMLDetailsElement).open)}>
+            <summary className="label cursor-pointer py-2 mt-3 border-b border-rule select-none">
+              {setupOpen ? 'Setup' : (
+                <span>{stage.label} &middot; {archetype.name}</span>
+              )}
+            </summary>
 
-          <section className="border-t border-rule pt-5 pb-1">
-            <span className="step-number">04</span>
-            <h2 className="section-title mt-1">Claims worth making</h2>
-            <p className="hint mt-1 mb-3.5">
-              The first one you pick becomes the lead claim. Three to five is usually right.
-            </p>
-            <PillRow
-              items={scopedClaims.map((claim) => ({ id: claim.id, label: claim.label, detail: claim.detail }))}
-              selected={brief.claims}
-              missing={gone.claims}
-              onToggle={toggleClaim}
-              empty="Pick a product to see its claims."
-            />
-          </section>
+            <div className="mt-2.5 flex flex-col gap-2.5">
+              {/* Product */}
+              <div>
+                <label className="label mb-1 block">Product</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {repository.products.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="pill"
+                      data-on={brief.products.includes(p.id) ? 'true' : undefined}
+                      onClick={() => toggleProduct(p.id)}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                  {repository.products.length === 0 && (
+                    <p className="hint">No products loaded.</p>
+                  )}
+                </div>
+              </div>
 
-          <section className="border-t border-rule pt-5 pb-1">
-            <span className="step-number">05</span>
-            <h2 className="section-title mt-1">Worries in play</h2>
-            <p className="hint mt-1 mb-3.5">
-              Tick the ones that apply to this page. You place them into sections on the right.
-            </p>
-            <PillRow
-              items={scopedWorries.map((worry) => ({
-                id: worry.id,
-                label: worry.label,
-                detail: worry.detail,
-                tag: worry.tags || undefined,
-              }))}
-              selected={brief.worries}
-              missing={gone.worries}
-              onToggle={toggleWorry}
-              empty="Pick a product to see its worries."
-            />
-          </section>
+              {/* Awareness */}
+              <div>
+                <label className="label mb-1 block" htmlFor="awareness">Awareness stage</label>
+                <select
+                  id="awareness"
+                  className="field"
+                  value={stage.id}
+                  onChange={(event) => {
+                    patch({ awareness: event.target.value, spineOverride: '' })
+                    setShowIneligible(false)
+                  }}
+                >
+                  {framework.awareness.map((option) => (
+                    <option key={option.id} value={option.id}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
 
-          <section className="border-t border-rule pt-5 pb-1">
-            <span className="step-number">06</span>
-            <h2 className="section-title mt-1">Archetype and awareness</h2>
-            <p className="hint mt-1 mb-3.5">
-              The archetype determines which slots exist. Awareness filters which claims are selectable.
-            </p>
-
-            <div className="flex flex-wrap gap-2.5">
-              <div className="min-w-0 flex-1 basis-[200px]">
-                <label className="label mb-1.5 block" htmlFor="archetype">
-                  Archetype
-                </label>
+              {/* Archetype */}
+              <div>
+                <label className="label mb-1 block" htmlFor="archetype">Archetype</label>
                 <select
                   id="archetype"
                   className="field"
@@ -659,87 +629,225 @@ export function Workbench({
                   }}
                 >
                   {ARCHETYPE_LIST.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.name}
-                    </option>
+                    <option key={option.id} value={option.id}>{option.name}</option>
                   ))}
                 </select>
               </div>
-              <div className="min-w-0 flex-1 basis-[200px]">
-                <label className="label mb-1.5 block" htmlFor="awareness">
-                  Awareness stage
-                </label>
-                <select
-                  id="awareness"
+
+              {/* Controlling idea */}
+              <div>
+                <label className="label mb-1 block" htmlFor="idea">Controlling idea</label>
+                <textarea
+                  id="idea"
                   className="field"
-                  value={stage.id}
-                  onChange={(event) => patch({ awareness: event.target.value, spineOverride: '' })}
-                >
-                  {framework.awareness.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  rows={2}
+                  placeholder="One sentence. The thesis of the page."
+                  value={brief.idea}
+                  onChange={(event) => patch({ idea: event.target.value })}
+                />
               </div>
             </div>
+          </details>
 
-            <div className="note-panel mt-3">
-              <p className="text-muted">{archetype.description}</p>
-              {archetype.maxClaims && (
-                <p className="mt-1.5 text-muted">
-                  Max <b className="font-semibold text-ink">{archetype.maxClaims}</b> claims (numbered slots).
-                  {archetype.reasonOnly && ' Only reason scope claims are eligible.'}
-                </p>
+          {/* ---- Claims ---- */}
+          <div className="mt-3">
+            <p className="label py-1 border-b border-rule">
+              Claims ({eligibleClaims.length})
+            </p>
+            <div className="mt-1">
+              {eligibleClaims.length === 0 && brief.products.length > 0 && (
+                <p className="hint py-2">No claims eligible for this product and awareness stage.</p>
               )}
-            </div>
+              {eligibleClaims.length === 0 && brief.products.length === 0 && (
+                <p className="hint py-2">Pick a product to see its claims.</p>
+              )}
+              {eligibleClaims.map((claim) => {
+                const on = brief.claims.includes(claim.id)
+                return (
+                  <div
+                    key={claim.id}
+                    className="content-row"
+                    data-on={on ? 'true' : undefined}
+                    onClick={() => toggleClaim(claim.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleClaim(claim.id) } }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() => toggleClaim(claim.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-0.5 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="content-row-label text-[13px]">{claim.label}</span>
+                        <StrengthBar value={claim.strength} />
+                      </div>
+                      {claim.detail && (
+                        <p className="text-[11.5px] text-muted mt-0.5">{claim.detail}</p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
 
-            <div className="flex flex-wrap gap-2.5 mt-3">
-              <div className="min-w-0 flex-1 basis-[200px]">
-                <label className="label mb-1.5 block" htmlFor="goal">
-                  Page goal
-                </label>
-                <select
-                  id="goal"
-                  className="field"
-                  value={goal.id}
-                  onChange={(event) => patch({ goal: event.target.value })}
-                >
-                  {framework.goals.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        {/* ------------------------- right ------------------------- */}
-        <div className="min-[940px]:sticky min-[940px]:top-6">
-          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3 border-b border-ink pb-2.5">
-            <h2 className="section-title">{skim ? 'Skim test' : 'Outline'}</h2>
-            <div className="flex flex-wrap gap-2">
-              <button className="ghost" type="button" onClick={() => setSkim(!skim)}>
-                {skim ? 'Show the detail' : 'Headings only'}
-              </button>
-              <button className="ghost" type="button" onClick={() => void copyMarkdown()}>
-                {copied ? 'Copied' : 'Copy as markdown'}
-              </button>
+              {/* Ineligible claims (hidden, expandable per 06-ui-spec.md) */}
+              {ineligibleClaims.length > 0 && (
+                <div className="mt-1 border-t border-dashed border-rule pt-1">
+                  <button
+                    type="button"
+                    className="label cursor-pointer text-muted hover:text-ink"
+                    onClick={() => setShowIneligible(!showIneligible)}
+                  >
+                    {showIneligible ? 'Hide' : `${ineligibleClaims.length} claim${ineligibleClaims.length > 1 ? 's' : ''} not eligible here`}
+                  </button>
+                  {showIneligible && (
+                    <div className="mt-1 opacity-60">
+                      {ineligibleClaims.map((claim) => (
+                        <div key={claim.id} className="py-1 text-[12px] text-muted border-b border-rule last:border-b-0">
+                          <span>{claim.label}</span>
+                          <span className="ml-2 font-mono text-[10px]">
+                            {!claim.awareness?.includes(brief.awareness) && `not ${brief.awareness}`}
+                            {archetype.reasonOnly && claim.scope !== 'reason' && ` scope: ${claim.scope}`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="mt-3.5 flex flex-wrap items-end gap-2.5">
-            <div className="min-w-0 flex-1 basis-[180px]">
-              <label className="label mb-1.5 block" htmlFor="outline-name">
-                Name this outline
-              </label>
+          {/* ---- Objections (starts closed per 06-ui-spec.md) ---- */}
+          <details open={objectionsOpen} onToggle={(e) => setObjectionsOpen((e.target as HTMLDetailsElement).open)} className="mt-3">
+            <summary className="label cursor-pointer py-1 border-b border-rule select-none">
+              Objections {pickedWorries.length > 0 && `(${pickedWorries.length} selected)`}
+            </summary>
+            <div className="mt-1">
+              {scopedWorries.length === 0 && brief.products.length > 0 && (
+                <p className="hint py-2">No objections for this product.</p>
+              )}
+              {scopedWorries.map((worry) => {
+                const on = brief.worries.includes(worry.id)
+                return (
+                  <div
+                    key={worry.id}
+                    className="content-row"
+                    data-on={on ? 'true' : undefined}
+                    onClick={() => toggleWorry(worry.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleWorry(worry.id) } }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() => toggleWorry(worry.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-0.5 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="content-row-label text-[13px]">{worry.label}</span>
+                        <StrengthBar value={worry.severity} variant="objection" />
+                      </div>
+                      {worry.category && (
+                        <p className="text-[11.5px] text-muted mt-0.5">{worry.category}</p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </details>
+
+          {/* Repo info bar */}
+          {status === 'ready' && source && (
+            <div className="mt-4 flex items-center gap-2">
+              <span className="font-mono text-[10px] text-muted">
+                {repository.products.length}p {repository.claims.length}c {repository.worries.length}o
+              </span>
+              <button className="mini" type="button" onClick={() => void load(true)}>Refresh</button>
+            </div>
+          )}
+        </div>
+
+        {/* ============================================================ */}
+        {/* CENTER PANE: See (the wireframe page)                         */}
+        {/* ============================================================ */}
+        <div className="pane-center bg-[var(--paper)]">
+          {/* Page thesis */}
+          {brief.idea.trim() && (
+            <div className="text-center mb-4 pb-3 border-b border-rule">
+              <p className="text-[13px] italic text-muted">{brief.idea}</p>
+            </div>
+          )}
+
+          {!ready && (
+            <div className="text-center py-12">
+              <p className="label mb-1.5">No page to show</p>
+              <p className="text-[13px] text-muted">Pick a product and select claims.</p>
+            </div>
+          )}
+
+          {ready && (
+            <div className="flex flex-col gap-2">
+              {visSlots.map((slot, i) => {
+                const assignment = slotAssignments.find((a) => a.slot.key === slot.key)
+                const disabled = assignment ? !assignment.active : false
+                const isSelected = selectedSlot !== null && slotAssignments[selectedSlot]?.slot.key === slot.key
+                const slotIndex = slotAssignments.findIndex((a) => a.slot.key === slot.key)
+                const needsImage = slot.needsMedia && assignment && !assignment.assetId && assignment.active && slot.content !== 'none'
+
+                return (
+                  <div
+                    key={slot.key}
+                    className="wire-block"
+                    data-selected={isSelected ? 'true' : undefined}
+                    data-disabled={disabled ? 'true' : undefined}
+                    tabIndex={0}
+                    onClick={() => setSelectedSlot(isSelected ? null : slotIndex)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedSlot(isSelected ? null : slotIndex) }
+                    }}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className="step-number shrink-0 w-5 text-right">{String(i + 1).padStart(2, '0')}</span>
+                      <div className="min-w-0 flex-1">
+                        <SectionWire sectionType={slot.sectionType} number={slot.number} />
+                        <div className="flex items-center justify-between mt-1.5">
+                          <span className="font-mono text-[9px] uppercase tracking-wider text-muted">{slot.role}</span>
+                          {needsImage && (
+                            <span className="font-mono text-[9px] bg-[var(--amber-bg)] text-[var(--amber)] px-1 py-0.5 rounded">
+                              no image
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ============================================================ */}
+        {/* RIGHT PANE: Inspect                                           */}
+        {/* ============================================================ */}
+        <div className="pane-right">
+          {/* Save bar */}
+          <div className="flex flex-wrap items-end gap-2.5 mb-4 pb-3 border-b border-rule">
+            <div className="min-w-0 flex-1 basis-[140px]">
+              <label className="label mb-1 block" htmlFor="outline-name">Outline name</label>
               <input
                 id="outline-name"
                 ref={nameRef}
                 className="field"
-                placeholder="Brass pulls for renovators"
+                placeholder="Name this outline"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
               />
@@ -748,196 +856,94 @@ export function Workbench({
               {saving ? 'Saving' : 'Save'}
             </button>
           </div>
+          {saveMessage && <p className="hint mb-2">{saveMessage}</p>}
 
-          {saveMessage && <p className="hint mt-2">{saveMessage}</p>}
-          {headingError && <div className="note-panel mt-3">{headingError}</div>}
+          {/* ---- Errors (always visible) ---- */}
+          {errors.length > 0 && (
+            <div className="mb-3 flex flex-col gap-1.5">
+              {errors.map((flag, i) => (
+                <div key={i} className="text-[13px] py-1.5 px-2.5 rounded" style={{ background: 'var(--rust-bg)', color: 'var(--rust)' }}>
+                  <b className="font-semibold">{flag.title}.</b> {flag.message}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ---- Warnings (collapsible, state persists) ---- */}
+          {warnings.length > 0 && (
+            <details open={warningsOpen} onToggle={(e) => setWarningsOpen((e.target as HTMLDetailsElement).open)} className="mb-3">
+              <summary className="label cursor-pointer py-1 select-none" style={{ color: 'var(--amber)' }}>
+                {warnings.length} warning{warnings.length > 1 ? 's' : ''}
+              </summary>
+              <div className="mt-1.5 flex flex-col gap-1.5">
+                {warnings.map((flag, i) => (
+                  <div key={i} className="text-[13px] py-1.5 px-2.5 rounded" style={{ background: 'var(--amber-bg)', color: 'var(--amber)' }}>
+                    <b className="font-semibold">{flag.title}.</b> {flag.message}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {/* Clean signal */}
+          {errors.length === 0 && warnings.length === 0 && ready && (
+            <div className="text-[13px] py-1.5 px-2.5 rounded mb-3" style={{ background: 'var(--green-bg)', color: 'var(--green)' }}>
+              <b className="font-semibold">Clean.</b> Nothing to fix. {visSlots.length} slots ready.
+            </div>
+          )}
+
+          {/* ---- Section inspector ---- */}
+          {selectedSlot !== null && slotAssignments[selectedSlot] && (
+            <div className="border border-rule bg-white p-3.5 rounded mb-3">
+              <h3 className="label mb-3">{slotAssignments[selectedSlot].slot.role}</h3>
+              <SlotDetail assignment={slotAssignments[selectedSlot]} />
+            </div>
+          )}
 
           {!ready && (
             <div className="note-panel mt-3">
-              <p className="label mb-1.5">Nothing to show yet</p>
+              <p className="label mb-1.5">Select content</p>
               <p className="text-[13.5px]">
-                Pick a product in step 03 and a claim in step 04. The outline appears here straight away, before any
-                copy is written, and the button to write the copy appears with it.
+                Pick a product and check claims on the left. The wireframe page appears in the centre, and validation flags appear here.
               </p>
             </div>
           )}
 
+          {ready && headingError && <div className="note-panel mb-3">{headingError}</div>}
+
           {ready && (
-            <>
-              {/* ---- Archetype flags ---- */}
-              {archetypeFlags.length > 0 && (
-                <div className="mt-3 flex flex-col gap-1.5">
-                  {archetypeFlags.filter((f) => f.level === 'err').map((flag, i) => (
-                    <div key={i} className="note-panel border-l-2 border-l-red-400">
-                      <p className="text-[13px]"><b className="font-semibold">{flag.title}.</b> {flag.message}</p>
-                    </div>
-                  ))}
-                  {archetypeFlags.filter((f) => f.level === 'warn').map((flag, i) => (
-                    <div key={i} className="note-panel border-l-2 border-l-amber-400">
-                      <p className="text-[13px]"><b className="font-semibold">{flag.title}.</b> {flag.message}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {archetypeFlags.length === 0 && brief.products.length > 0 && pickedClaims.length > 0 && (
-                <div className="note-panel mt-3 border-l-2 border-l-green-400">
-                  <p className="text-[13px]"><b className="font-semibold">Clean.</b> Nothing to fix. {activeSlotCount} slots ready.</p>
-                </div>
-              )}
+            <div className="mt-3">
+              <button
+                className="button w-full"
+                type="button"
+                onClick={() => void writeHeadings()}
+                disabled={working || hasErrors}
+              >
+                {working ? 'Writing copy' : 'Generate copy'}
+              </button>
+              {hasErrors && <p className="hint mt-1.5">Clear the errors above first.</p>}
+            </div>
+          )}
 
-              {/* ---- Slot assignments ---- */}
-              <div className="mt-3">
-                <p className="label mb-2">{archetype.name} slots</p>
-                <div className="flex flex-col gap-1.5">
-                  {slotAssignments.map((assignment, index) => (
-                    <SlotSlab
-                      key={assignment.slot.key}
-                      assignment={assignment}
-                      index={index}
-                      selected={selectedSlot === index}
-                      onClick={() => setSelectedSlot(selectedSlot === index ? null : index)}
-                    />
-                  ))}
-                </div>
-              </div>
+          {corrections.length > 0 && (
+            <div className="note-panel mt-3">
+              <p className="label mb-1.5">What was corrected</p>
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                {corrections.map((line, index) => (
+                  <li key={index} className="text-[13px]">{line}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-              {/* ---- Slot inspector ---- */}
-              {selectedSlot !== null && slotAssignments[selectedSlot] && (
-                <div className="mt-3 border border-rule bg-white p-3.5 rounded">
-                  <h3 className="label mb-3">{slotAssignments[selectedSlot].slot.role}</h3>
-                  <SlotDetail assignment={slotAssignments[selectedSlot]} />
-                </div>
-              )}
-
-              {/* ---- Spine driven outline (kept for copy generation) ---- */}
-              <details className="mt-5">
-                <summary className="label cursor-pointer py-1">Spine outline (copy generation)</summary>
-                <div className={skim ? 'skim mt-2' : 'mt-2'}>
-                  {sections.map((section, index) => (
-                    <SectionSlab
-                      key={section.id}
-                      section={section}
-                      index={index}
-                      total={sections.length}
-                      heading={headings[section.id]}
-                      attachable={pickedWorries.filter((worry) => brief.assignments[worry.id] !== section.id)}
-                      trayOpen={trayFor === section.id}
-                      onToggleTray={() => setTrayFor(trayFor === section.id ? null : section.id)}
-                      onAssign={assign}
-                      onNudge={nudge}
-                      onDragStart={setDragId}
-                      onDragEnd={() => {
-                        setDragId(null)
-                        setOverId(null)
-                      }}
-                      onDragEnter={setOverId}
-                      onDropOn={dropOn}
-                      dragging={dragId === section.id}
-                      over={dropEdgeFor(section.id, index)}
-                    />
-                  ))}
-                </div>
-              </details>
-
-              <p aria-live="polite" className="sr-only">
-                {announcement}
-              </p>
-
-              {unplaced.length > 0 && !skim && (
-                <div className="mt-4 border border-rule bg-card p-3.5">
-                  <h3 className="label mb-2">Worries with nowhere to go</h3>
-                  {unplaced.map((worry) => (
-                    <div
-                      key={worry.id}
-                      className="flex flex-wrap items-start gap-2 border-t border-rule py-1.5 text-[13px] first-of-type:border-t-0"
-                    >
-                      <div className="min-w-0 flex-1">
-                        {worry.label}
-                        <div className="text-muted">{worry.detail}</div>
-                      </div>
-                      <button className="mini" type="button" onClick={() => assign(worry.id, 'own')}>
-                        Own section
-                      </button>
-                      <button className="mini" type="button" onClick={() => assign(worry.id, 'faq')}>
-                        Questions
-                      </button>
-                    </div>
-                  ))}
-                  <p className="hint mt-2">
-                    Give it a section if someone would leave the page over it. Send it to questions if they would only
-                    hesitate. Or drop it into any section above.
-                  </p>
-                </div>
-              )}
-
-              <div className="mt-5 flex flex-wrap items-center gap-2.5">
-                <button className="button" type="button" onClick={() => void writeHeadings()} disabled={working || hasErrors}>
-                  {working
-                    ? 'Writing the copy'
-                    : unwritten === sections.length
-                      ? 'Write the copy'
-                      : 'Rewrite the copy'}
-                </button>
-                {hasErrors && <span className="hint">Clear the errors above first.</span>}
-                {pass && drifted > 0 && (
-                  <span className="hint">
-                    {drifted === 1 ? '1 section drifted' : `${drifted} sections drifted`} since the last pass.
-                  </span>
-                )}
-              </div>
-
-              {(references.length > 0 || referenceProblems.length > 0) && (
-                <div className="note-panel mt-3">
-                  <p className="label mb-1.5">Pages read for reference</p>
-                  {references.length > 0 && (
-                    <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                      {references.map((reference) => (
-                        <li key={reference.page} className="text-[13px]">
-                          {reference.page}{' '}
-                          <span className="text-muted">
-                            {reference.outline.length === 1
-                              ? '1 heading'
-                              : `${reference.outline.length} headings`}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {referenceProblems.length > 0 && (
-                    <ul className="m-0 mt-1.5 flex list-none flex-col gap-1 p-0">
-                      {referenceProblems.map((problem) => (
-                        <li key={problem.url} className="text-[13px] text-muted">
-                          <span className="font-mono text-[11.5px] break-all">{problem.url}</span> {problem.message}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <p className="hint mt-2">
-                    These shape how the copy reads. Every claim still comes from the sheet.
-                  </p>
-                </div>
-              )}
-
-              {corrections.length > 0 && (
-                <div className="note-panel mt-3">
-                  <p className="label mb-1.5">What was corrected</p>
-                  <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-                    {corrections.map((line, index) => (
-                      <li key={index} className="text-[13px]">
-                        {line}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <p className="hint mt-3.5">
-                {`${activeSlotCount} slots. ${archetype.name}. ${pickedClaims.length} claims, ${pickedWorries.length} objections.`}
-              </p>
-            </>
+          {/* Summary line */}
+          {ready && (
+            <p className="hint mt-3.5">
+              {archetype.name}. {pickedClaims.length} claim{pickedClaims.length !== 1 ? 's' : ''}, {pickedWorries.length} objection{pickedWorries.length !== 1 ? 's' : ''}.
+            </p>
           )}
         </div>
       </div>
-    </main>
+    </>
   )
 }

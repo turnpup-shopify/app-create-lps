@@ -10,6 +10,7 @@ export const TAB_NAMES = {
   products: 'Products',
   claims: 'Claims',
   worries: 'Worries',
+  assets: 'Assets',
   awareness: 'Awareness',
   spines: 'Spines',
   slots: 'Slots',

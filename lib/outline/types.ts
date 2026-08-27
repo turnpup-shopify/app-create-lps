@@ -20,13 +20,35 @@ export interface Product {
   detail: string
 }
 
+export type ClaimScope = 'reason' | 'spec' | 'detail'
+
 export interface Claim {
   id: string
   /** Product handle this belongs to, or `*` for every product. */
   product: string
+  /** The feature. Primary display text. */
   label: string
+  /** The benefit. Secondary display text. */
   detail: string
+  /** reason, spec, or detail. Some arcs only accept reason. */
+  scope: ClaimScope
+  /** 1 to 5. Drives section order. */
+  strength: number
+  /** Awareness stages where this claim is valid. */
+  awareness: string[]
+  /** Objection ids this claim answers. Powers the unanswered doubt warning. */
+  kills_objection: string[]
+  /** What it means to them. */
+  emotion: string
+  /** The number or fact behind it. */
+  proof: string
+  /** Where the proof came from. */
+  proof_source: string
+  /** Preferred image asset id. */
+  asset_id: string
 }
+
+export type ObjectionCategory = 'price' | 'efficacy' | 'trust' | 'effort' | 'risk'
 
 export interface Worry {
   id: string
@@ -38,15 +60,27 @@ export interface Worry {
   detail: string
   /** Comma separated. Only used to pick a default insert position. */
   tags: string
+  /** 1 to 5. Drives objection order. */
+  severity: number
+  /** price, efficacy, trust, effort, or risk. */
+  category: string
+}
+
+export interface Asset {
+  asset_id: string
+  orientation: string
+  crops: string[]
+  proves_claim: string
 }
 
 export interface Repository {
   products: Product[]
   claims: Claim[]
   worries: Worry[]
+  assets: Asset[]
 }
 
-export const emptyRepository = (): Repository => ({ products: [], claims: [], worries: [] })
+export const emptyRepository = (): Repository => ({ products: [], claims: [], worries: [], assets: [] })
 
 /** worryId to slotId. A worry belongs to exactly one section. */
 export type Assignments = Record<string, SlotId>

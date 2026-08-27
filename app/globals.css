@@ -5,14 +5,23 @@
 /* ------------------------------------------------------------------ */
 
 :root {
-  --paper: #e7eae4;
-  --card: #f6f7f3;
-  --ink: #191e19;
-  --muted: #6c736b;
-  --rule: #c8cdc4;
+  --paper: #E7EAEE;
+  --surface: #FFF;
+  --card: #FFF;
+  --ink: #15171C;
+  --muted: #767C86;
+  --rule: #D9DDE3;
+  --wire: #C8CDD4;
+  --accent: #3D3A9E;
+  --accent-bg: #EDECF8;
+  --amber: #8A5A12;
+  --amber-bg: #FAF1E0;
+  --rust: #9B2F26;
+  --rust-bg: #FBEBE9;
+  --green: #1E6B4E;
+  --green-bg: #E7F2ED;
   --mark: #efe05c;
-  --deep: #1e3a6b;
-  /* Readable ink on the highlighter stripe. */
+  --deep: #3D3A9E;
   --mark-ink: #4a4c2e;
 }
 
@@ -325,6 +334,151 @@ select.field {
   display: block;
   color: var(--muted);
   font-size: 11px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Three pane layout                                                   */
+/* ------------------------------------------------------------------ */
+
+.three-pane {
+  display: grid;
+  grid-template-columns: 340px 316px 1fr;
+  gap: 0;
+  min-height: 100vh;
+}
+
+.three-pane > .pane-left {
+  padding: 20px 16px;
+  border-right: 1px solid var(--rule);
+  overflow-y: auto;
+  max-height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+.three-pane > .pane-center {
+  padding: 20px 16px;
+  border-right: 1px solid var(--rule);
+  overflow-y: auto;
+  max-height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+.three-pane > .pane-right {
+  padding: 20px 16px;
+  overflow-y: auto;
+  max-height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+@media (max-width: 1120px) {
+  .three-pane {
+    grid-template-columns: 340px 1fr;
+  }
+  .three-pane > .pane-center {
+    border-right: none;
+  }
+  .three-pane > .pane-right {
+    grid-column: 1 / -1;
+    max-height: none;
+    position: static;
+    border-top: 1px solid var(--rule);
+  }
+}
+
+@media (max-width: 760px) {
+  .three-pane {
+    grid-template-columns: 1fr;
+  }
+  .three-pane > .pane-left {
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+    max-height: none;
+    position: static;
+  }
+  .three-pane > .pane-center {
+    max-height: none;
+    position: static;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Wireframe blocks                                                    */
+/* ------------------------------------------------------------------ */
+
+.wire-block {
+  position: relative;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  cursor: pointer;
+  background: var(--card);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.wire-block:hover {
+  border-color: var(--muted);
+}
+
+.wire-block[data-selected='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.wire-block[data-disabled='true'] {
+  opacity: 0.35;
+}
+
+/* ------------------------------------------------------------------ */
+/* Strength / severity bars                                            */
+/* ------------------------------------------------------------------ */
+
+.strength-bar {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.strength-bar > span {
+  width: 10px;
+  height: 5px;
+  border-radius: 1px;
+  background: var(--rule);
+}
+
+.strength-bar > span[data-filled='true'] {
+  background: var(--accent);
+}
+
+.severity-bar > span[data-filled='true'] {
+  background: var(--rust);
+}
+
+/* ------------------------------------------------------------------ */
+/* Claim and objection rows                                            */
+/* ------------------------------------------------------------------ */
+
+.content-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+}
+
+.content-row:last-child {
+  border-bottom: none;
+}
+
+.content-row[data-on='true'] .content-row-label {
+  font-weight: 600;
+}
+
+.content-row[data-on='true'] {
+  background: linear-gradient(to top, var(--mark) 0%, transparent 0%);
 }
 
 /* ------------------------------------------------------------------ */

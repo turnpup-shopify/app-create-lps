@@ -8,6 +8,7 @@ import {
   type TabProblem,
 } from '@/lib/repository/framework-tabs'
 import {
+  parseAssetsTab,
   parseClaimsTab,
   parseProductsTab,
   parseRepositoryCsv,
@@ -132,6 +133,7 @@ export async function GET(request: Request) {
   const products = parseProductsTab(texts.products)
   const claims = parseClaimsTab(texts.claims)
   const worries = parseWorriesTab(texts.worries)
+  const assets = parseAssetsTab(texts.assets)
 
   const tabs: FrameworkTabs = {
     awareness: texts.awareness,
@@ -196,6 +198,7 @@ export async function GET(request: Request) {
     products,
     claims,
     worries,
+    assets,
     framework,
     sources,
     problems: [...missing, ...problems],

@@ -7,12 +7,28 @@ export function worry(id: string, extra: Partial<Worry> = {}): Worry {
     label: `worry ${id}`,
     detail: `answer ${id}`,
     tags: '',
+    severity: 3,
+    category: '',
     ...extra,
   }
 }
 
 export function claim(id: string, extra: Partial<Claim> = {}): Claim {
-  return { id, product: '*', label: `claim ${id}`, detail: `support ${id}`, ...extra }
+  return {
+    id,
+    product: '*',
+    label: `claim ${id}`,
+    detail: `support ${id}`,
+    scope: 'reason',
+    strength: 3,
+    awareness: [],
+    kills_objection: [],
+    emotion: '',
+    proof: '',
+    proof_source: '',
+    asset_id: '',
+    ...extra,
+  }
 }
 
 export function product(id: string, extra: Partial<Product> = {}): Product {
@@ -20,5 +36,5 @@ export function product(id: string, extra: Partial<Product> = {}): Product {
 }
 
 export function repository(partial: Partial<Repository> = {}): Repository {
-  return { products: [], claims: [], worries: [], ...partial }
+  return { products: [], claims: [], worries: [], assets: [], ...partial }
 }

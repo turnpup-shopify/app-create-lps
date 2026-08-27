@@ -68,6 +68,12 @@ function found(row: Row | undefined): string {
 function parseAwareness(rows: Row[], problems: TabProblem[]): AwarenessStage[] | null {
   const stages: AwarenessStage[] = []
   rows.forEach((row, index) => {
+    // When a flat framework table lands in the Awareness tab, non-awareness
+    // rows (spine, slot, goal, ...) come along for the ride. Skip them
+    // silently so only the real awareness rows are validated.
+    const type = cell(row, 'type').toLowerCase()
+    if (type && type !== 'awareness' && type !== 'stage' && type !== 'stages') return
+
     const id = cell(row, 'id')
     const label = cell(row, 'label')
     const lead = cell(row, 'lead')

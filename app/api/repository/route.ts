@@ -43,6 +43,17 @@ async function fetchText(url: string, fresh: boolean): Promise<string | null> {
 }
 
 /**
+ * Try the expected tab name, then lowercase. Google Sheets gviz is case
+ * sensitive, but writers name tabs "products" as often as "Products".
+ */
+async function fetchTab(sheetId: string, name: string, fresh: boolean): Promise<string | null> {
+  const text = await fetchText(tabUrl(sheetId, name), fresh)
+  if (text) return text
+  const lower = name.toLowerCase()
+  return lower !== name ? fetchText(tabUrl(sheetId, lower), fresh) : null
+}
+
+/**
  * Reads the sheet. Never writes to it.
  * Cached for five minutes. `?fresh=1` bypasses the cache.
  */
@@ -126,7 +137,7 @@ export async function GET(request: Request) {
   const keys = Object.keys(TAB_NAMES) as TabKey[]
 
   const fetched = await Promise.all(
-    keys.map(async (key) => [key, await fetchText(tabUrl(sheetId, TAB_NAMES[key]), fresh)] as const),
+    keys.map(async (key) => [key, await fetchTab(sheetId, TAB_NAMES[key], fresh)] as const),
   )
   const texts = Object.fromEntries(fetched) as Record<TabKey, string | null>
 
